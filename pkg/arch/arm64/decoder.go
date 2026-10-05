@@ -163,11 +163,15 @@ const (
 	BTI_JC
 	BTI
 	// SIMD&FP 访存 + MOVI (数据搬运子集)
-	V_LDR  // LDR (SIMD&FP) 单寄存器
-	V_STR  // STR (SIMD&FP) 单寄存器
-	V_LDP  // LDP (SIMD&FP) 寄存器对
-	V_STP  // STP (SIMD&FP) 寄存器对
-	V_MOVI // MOVI (AdvSIMD 立即数)
+	V_LDR     // LDR (SIMD&FP) 单寄存器
+	V_STR     // STR (SIMD&FP) 单寄存器
+	V_LDP     // LDP (SIMD&FP) 寄存器对
+	V_STP     // STP (SIMD&FP) 寄存器对
+	V_MOVI    // MOVI (AdvSIMD 立即数)
+	V_FMOV_VV // FMOV Vd, Vn (寄存器搬运)
+	V_FMOV_GV // FMOV Vd, Xn (GPR → 向量)
+	V_FMOV_VG // FMOV Xd, Vn (向量 → GPR)
+	V_FMOV_I  // FMOV Vd, #imm (标量浮点立即数)
 	UNSUPPORTED
 )
 
@@ -345,6 +349,7 @@ func OpName(op Op) string {
 		PACIASP: "PACIASP", AUTIASP: "AUTIASP", PACIAZ: "PACIAZ", AUTIAZ: "AUTIAZ", PACIBSP: "PACIBSP", AUTIBSP: "AUTIBSP", XPACLRI: "XPACLRI",
 		BTI_C: "BTI c", BTI_J: "BTI j", BTI_JC: "BTI jc", BTI: "BTI",
 		V_LDR: "LDR(fp)", V_STR: "STR(fp)", V_LDP: "LDP(fp)", V_STP: "STP(fp)", V_MOVI: "MOVI",
+		V_FMOV_VV: "FMOV(v,v)", V_FMOV_GV: "FMOV(v,r)", V_FMOV_VG: "FMOV(r,v)", V_FMOV_I: "FMOV(imm)",
 	}
 	if n, ok := names[op]; ok {
 		return n

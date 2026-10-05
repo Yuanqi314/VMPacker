@@ -96,6 +96,7 @@
 #define OP_VSTOREP                                                             \
   0x9B /* STP Vt1,Vt2,[Xb,#imm]  9B: [op][vt1][vt2][base][imm32][width] */
 #define OP_VMOVI 0x9C /* MOVI Vt,#imm128   18B: [op][vt][val_lo64][val_hi64] */
+#define OP_VMOV 0x30  /* FMOV 寄存器移动   5B: [op][dir][dst][src][width] */
 
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \

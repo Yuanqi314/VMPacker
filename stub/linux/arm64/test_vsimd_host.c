@@ -187,6 +187,63 @@ int main(void) {
     CHECK(sz == 8, "vstore via out-of-range SP is skipped (no crash)");
   }
 
+  /* ---- FMOV 寄存器搬运 (h_vmov) ---- */
+  {
+    /* dir=1 gpr→vec (fmov d5, x2) */
+    vm.R[2] = 0x1122334455667788ULL;
+    memset(vm.V[5], 0xFF, 16);
+    bc[0] = OP_VMOV;
+    bc[1] = 1; /* dir gpr→vec */
+    bc[2] = 5; /* dst V5 */
+    bc[3] = 2; /* src R2 */
+    bc[4] = 8; /* width D */
+    vm.pc = 0;
+    u32 sz = h_vmov(&vm);
+    CHECK(sz == 5, "vmov returns size 5");
+    CHECK(memcmp(vm.V[5], &vm.R[2], 8) == 0, "fmov gpr→vec low 8 bytes");
+    int hz = 1;
+    for (int i = 8; i < 16; i++)
+      if (vm.V[5][i])
+        hz = 0;
+    CHECK(hz, "fmov gpr→vec zeroes high 8");
+
+    /* dir=2 vec→gpr (fmov x3, d6) */
+    for (int i = 0; i < 16; i++)
+      vm.V[6][i] = (u8)(0x20 + i);
+    vm.R[3] = 0xDEADBEEFDEADBEEFULL;
+    bc[1] = 2;
+    bc[2] = 3; /* dst R3 */
+    bc[3] = 6; /* src V6 */
+    bc[4] = 8;
+    vm.pc = 0;
+    h_vmov(&vm);
+    CHECK(memcmp(&vm.R[3], vm.V[6], 8) == 0, "fmov vec→gpr low 8 (zero-ext)");
+
+    /* dir=2 width=4 (fmov w3, s6): 高 32 位应为 0 */
+    vm.R[3] = 0xFFFFFFFFFFFFFFFFULL;
+    bc[4] = 4;
+    vm.pc = 0;
+    h_vmov(&vm);
+    CHECK((vm.R[3] >> 32) == 0, "fmov vec→gpr W zero-extends high 32");
+
+    /* dir=0 vec→vec (fmov d7, d8) width=8 */
+    for (int i = 0; i < 16; i++)
+      vm.V[8][i] = (u8)(0x90 + i);
+    memset(vm.V[7], 0xFF, 16);
+    bc[1] = 0;
+    bc[2] = 7;
+    bc[3] = 8;
+    bc[4] = 8;
+    vm.pc = 0;
+    h_vmov(&vm);
+    CHECK(memcmp(vm.V[7], vm.V[8], 8) == 0, "fmov vec→vec low 8");
+    int hz2 = 1;
+    for (int i = 8; i < 16; i++)
+      if (vm.V[7][i])
+        hz2 = 0;
+    CHECK(hz2, "fmov vec→vec zeroes high 8");
+  }
+
   printf("\n%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);
   return fails ? 1 : 0;
 }

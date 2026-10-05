@@ -161,6 +161,8 @@ static inline u8 vm_insn_size(u8 op) {
     return 9;
   case OP_VMOVI:
     return 18;
+  case OP_VMOV:
+    return 5;
   default:
     return 0;
   }

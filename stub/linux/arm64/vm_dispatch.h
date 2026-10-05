@@ -264,6 +264,9 @@ __attribute__((noinline)) VM_SECTION_MEM static u32 hw_vstorep(vm_ctx_t *vm) {
 __attribute__((noinline)) VM_SECTION_MEM static u32 hw_vmovi(vm_ctx_t *vm) {
   return h_vmovi(vm);
 }
+__attribute__((noinline)) VM_SECTION_MEM static u32 hw_vmov(vm_ctx_t *vm) {
+  return h_vmov(vm);
+}
 
 /* ---- TBZ/TBNZ (分支, 返回 0) ---- */
 __attribute__((noinline)) VM_SECTION_BRANCH static u32 hw_tbz(vm_ctx_t *vm) {
@@ -572,6 +575,7 @@ __attribute__((noinline)) static void vm_init_jump_table(vm_handler_fn *tbl) {
   tbl[OP_VLOADP] = hw_vloadp;
   tbl[OP_VSTOREP] = hw_vstorep;
   tbl[OP_VMOVI] = hw_vmovi;
+  tbl[OP_VMOV] = hw_vmov;
 
   /* TBZ/TBNZ */
   tbl[OP_TBZ] = hw_tbz;

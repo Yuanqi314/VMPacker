@@ -88,6 +88,7 @@ var opTable = map[byte]opInfo{
 	OpVLoadP:  {"V_LOADP", 9},  // op + vt1 + vt2 + base + imm32 + width
 	OpVStoreP: {"V_STOREP", 9}, // op + vt1 + vt2 + base + imm32 + width
 	OpVMovi:   {"V_MOVI", 18},  // op + vt + val_lo64 + val_hi64
+	OpVMov:    {"V_MOV", 5},    // op + dir + dst + src + width
 
 	OpTbz:  {"TBZ", 7}, // op + reg + bit + target32
 	OpTbnz: {"TBNZ", 7},

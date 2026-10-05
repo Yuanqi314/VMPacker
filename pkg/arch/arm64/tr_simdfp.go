@@ -23,11 +23,21 @@ func (t *Translator) vreg(n int) (byte, error) {
 	return byte(n), nil
 }
 
-// trVLoadStore 翻译 LDR/STR (SIMD&FP) 单寄存器 (offset 形)。
-func (t *Translator) trVLoadStore(inst vm.Instruction, isLoad bool) error {
-	if inst.WB != 0 {
-		return fmt.Errorf("SIMD&FP 访存回写(pre/post)模式暂不支持")
+// emitBaseAdj 把基址寄存器按有符号立即数调整 (writeback 用): R[base] += imm。
+// 复用整数 ADD/SUB 立即数操作码 (h_add_imm/h_sub_imm 作用于完整 64 位)。
+func (t *Translator) emitBaseAdj(base byte, imm int64) {
+	if imm >= 0 {
+		t.emit(vm.OpAddImm, base, base)
+		t.emitU32(uint32(imm))
+	} else {
+		t.emit(vm.OpSubImm, base, base)
+		t.emitU32(uint32(-imm))
 	}
+}
+
+// trVLoadStore 翻译 LDR/STR (SIMD&FP) 单寄存器。
+// 支持 offset / pre-index(WB=3) / post-index(WB=1)。
+func (t *Translator) trVLoadStore(inst vm.Instruction, isLoad bool) error {
 	vt, err := t.vreg(inst.Rd)
 	if err != nil {
 		return err
@@ -40,17 +50,29 @@ func (t *Translator) trVLoadStore(inst vm.Instruction, isLoad bool) error {
 	if isLoad {
 		op = vm.OpVLoad
 	}
-	t.emit(op, vt, base)
-	t.emitU32(uint32(int32(inst.Imm)))
-	t.emit(byte(inst.Shift)) // width
+	emitV := func(off int64) {
+		t.emit(op, vt, base)
+		t.emitU32(uint32(int32(off)))
+		t.emit(byte(inst.Shift)) // width
+	}
+	switch inst.WB {
+	case 0: // offset
+		emitV(inst.Imm)
+	case 3: // pre-index: base += imm, 再访问 [base]
+		t.emitBaseAdj(base, inst.Imm)
+		emitV(0)
+	case 1: // post-index: 访问 [base], 再 base += imm
+		emitV(0)
+		t.emitBaseAdj(base, inst.Imm)
+	default:
+		return fmt.Errorf("不支持的 SIMD&FP 访存寻址模式 WB=%d", inst.WB)
+	}
 	return nil
 }
 
-// trVLoadStorePair 翻译 LDP/STP (SIMD&FP) 寄存器对 (offset 形)。
+// trVLoadStorePair 翻译 LDP/STP (SIMD&FP) 寄存器对。
+// 支持 offset / pre-index(WB=3) / post-index(WB=1)。
 func (t *Translator) trVLoadStorePair(inst vm.Instruction, isLoad bool) error {
-	if inst.WB != 0 {
-		return fmt.Errorf("SIMD&FP 寄存器对回写(pre/post)模式暂不支持")
-	}
 	vt1, err := t.vreg(inst.Rd)
 	if err != nil {
 		return err
@@ -67,9 +89,48 @@ func (t *Translator) trVLoadStorePair(inst vm.Instruction, isLoad bool) error {
 	if isLoad {
 		op = vm.OpVLoadP
 	}
-	t.emit(op, vt1, vt2, base)
-	t.emitU32(uint32(int32(inst.Imm)))
-	t.emit(byte(inst.Shift)) // element width
+	emitV := func(off int64) {
+		t.emit(op, vt1, vt2, base)
+		t.emitU32(uint32(int32(off)))
+		t.emit(byte(inst.Shift)) // element width
+	}
+	switch inst.WB {
+	case 0:
+		emitV(inst.Imm)
+	case 3: // pre-index
+		t.emitBaseAdj(base, inst.Imm)
+		emitV(0)
+	case 1: // post-index
+		emitV(0)
+		t.emitBaseAdj(base, inst.Imm)
+	default:
+		return fmt.Errorf("不支持的 SIMD&FP 寄存器对寻址模式 WB=%d", inst.WB)
+	}
+	return nil
+}
+
+// trVMov 翻译 FMOV 寄存器搬运 (vec↔vec / gpr↔vec)。
+// dir: 0=vec→vec, 1=gpr→vec, 2=vec→gpr。
+func (t *Translator) trVMov(inst vm.Instruction, dir byte, dstIsV, srcIsV bool) error {
+	var dst, src byte
+	var err error
+	if dstIsV {
+		dst, err = t.vreg(inst.Rd)
+	} else {
+		dst, err = t.mapReg(inst.Rd)
+	}
+	if err != nil {
+		return err
+	}
+	if srcIsV {
+		src, err = t.vreg(inst.Rn)
+	} else {
+		src, err = t.mapReg(inst.Rn)
+	}
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVMov, dir, dst, src, byte(inst.Shift))
 	return nil
 }
 

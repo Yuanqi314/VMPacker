@@ -168,6 +168,87 @@ var simdfpPatterns = []InstrPattern{
 			}
 		},
 	},
+
+	// ---- FMOV Vd, Vn (寄存器搬运): 0001 1110 0 ftype 1 000000 10000 Rn Rd ----
+	{
+		Name: "V_FMOV_RR", Mask: 0xFF3FFC00, Value: 0x1E204000, Op: V_FMOV_VV,
+		Fields: []FieldDef{{Name: "ftype", Hi: 23, Lo: 22}, fRn, fRd},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			inst.Shift = fpTypeWidth(f["ftype"])
+			if inst.Shift == 0 {
+				inst.Op = int(UNSUPPORTED)
+			}
+		},
+	},
+
+	// ---- FMOV (通用 int↔fp): sf 0011110 ftype 1 rmode=00 opcode=11x 000000 Rn Rd ----
+	// bit16: 1 = GPR→Vec (opcode 111), 0 = Vec→GPR (opcode 110)
+	{
+		Name: "V_FMOV_GEN", Mask: 0x7F3EFC00, Value: 0x1E260000, Op: V_FMOV_GV,
+		Fields: []FieldDef{{Name: "ftype", Hi: 23, Lo: 22}, {Name: "dir", Hi: 16, Lo: 16}, fRn, fRd},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			inst.Shift = fpTypeWidth(f["ftype"])
+			if inst.Shift == 0 {
+				inst.Op = int(UNSUPPORTED)
+				return
+			}
+			if f["dir"] != 0 {
+				inst.Op = int(V_FMOV_GV) // GPR → Vec
+			} else {
+				inst.Op = int(V_FMOV_VG) // Vec → GPR
+			}
+		},
+	},
+
+	// ---- FMOV Vd, #imm (标量浮点立即数): 000 11110 0 ftype 1 imm8 100 00000 Rd ----
+	{
+		Name: "V_FMOV_IMM", Mask: 0xFE201FE0, Value: 0x1E201000, Op: V_FMOV_I,
+		Fields: []FieldDef{{Name: "ftype", Hi: 23, Lo: 22}, {Name: "imm8", Hi: 20, Lo: 13}, fRd},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			w := fpTypeWidth(f["ftype"])
+			if w == 0 {
+				inst.Op = int(UNSUPPORTED)
+				return
+			}
+			inst.Shift = w
+			inst.Imm = int64(vfpExpandImm(uint64(f["imm8"]), w == 8))
+		},
+	},
+}
+
+// fpTypeWidth: ftype(00=S,01=D,11=H) → 字节宽度 (H 暂不支持返回 0)
+func fpTypeWidth(ftype int64) int {
+	switch ftype {
+	case 0:
+		return 4 // S
+	case 1:
+		return 8 // D
+	}
+	return 0 // H (ftype=11) 等暂不支持
+}
+
+// vfpExpandImm 实现 ARM ARM VFPExpandImm: 8-bit 浮点立即数 → IEEE 位模式。
+// is64=true 返回 double 的 64 位; false 返回 float 的 32 位 (零扩展到 64)。
+func vfpExpandImm(imm8 uint64, is64 bool) uint64 {
+	var e, f uint
+	if is64 {
+		e, f = 11, 52
+	} else {
+		e, f = 8, 23
+	}
+	sign := (imm8 >> 7) & 1
+	b6 := (imm8 >> 6) & 1
+	var notb6 uint64
+	if b6 == 0 {
+		notb6 = 1
+	}
+	var rep uint64 // Replicate(imm8<6>, e-3)
+	if b6 != 0 {
+		rep = (uint64(1) << (e - 3)) - 1
+	}
+	exp := (notb6 << (e - 1)) | (rep << 2) | ((imm8 >> 4) & 3)
+	frac := (imm8 & 0xF) << (f - 4)
+	return (sign << (e + f)) | (exp << f) | frac
 }
 
 // advSIMDExpandImm 实现 ARM ARM 的 AdvSIMDExpandImm，返回 64-bit lane 值。

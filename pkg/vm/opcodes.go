@@ -99,6 +99,9 @@ const (
 	// MOVI (SIMD&FP 立即数): [op][vt][val_lo64_LE][val_hi64_LE] = 18B
 	//   V[vt] ← 128-bit 立即数 (由翻译器展开 AdvSIMDExpandImm)
 	OpVMovi byte = 0x9C
+	// FMOV 寄存器移动: [op][dir][dst][src][width] = 5B
+	//   dir=0 vec→vec, 1 gpr→vec, 2 vec→gpr; 仅搬 width 字节, 目标高位清零
+	OpVMov byte = 0x30
 
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target

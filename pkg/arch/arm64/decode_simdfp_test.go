@@ -54,6 +54,65 @@ func TestDecode_SIMDFP_More(t *testing.T) {
 	expect(t, "LDR s width", 4, in.Shift)
 }
 
+// FMOV 全形态 (objdump 核对) + VFPExpandImm 精确值。
+func TestDecode_SIMDFP_FMOV(t *testing.T) {
+	d := NewDecoder()
+	expect(t, "fmov s0,s1 Op", int(V_FMOV_VV), d.Decode(0x1E204020, 0).Op)
+	expect(t, "fmov d0,d1 width", 8, d.Decode(0x1E604020, 0).Shift)
+	expect(t, "fmov s0,w1 Op", int(V_FMOV_GV), d.Decode(0x1E270020, 0).Op)
+	expect(t, "fmov d0,x1 Op", int(V_FMOV_GV), d.Decode(0x9E670020, 0).Op)
+	expect(t, "fmov w0,s1 Op", int(V_FMOV_VG), d.Decode(0x1E260020, 0).Op)
+	expect(t, "fmov x0,d1 Op", int(V_FMOV_VG), d.Decode(0x9E660020, 0).Op)
+	// FMOV 立即数 → 精确 IEEE 位
+	expect(t, "fmov d0,#1.0", int64(0x3FF0000000000000), d.Decode(0x1E6E1000, 0).Imm)
+	expect(t, "fmov s0,#1.0", int64(0x3F800000), d.Decode(0x1E2E1000, 0).Imm)
+	expect(t, "fmov d0,#2.0", int64(0x4000000000000000), d.Decode(0x1E601000, 0).Imm)
+	expect(t, "fmov d5,#-0.5", int64(-0x4020000000000000), d.Decode(0x1E7C1005, 0).Imm)
+}
+
+// 回写 (pre/post) 寻址: WB + 有符号缩放 imm。
+func TestDecode_SIMDFP_Writeback(t *testing.T) {
+	d := NewDecoder()
+	in := d.Decode(0x3CC10C20, 0) // ldr q0,[x1,#16]!
+	expect(t, "pre WB", 3, in.WB)
+	expect(t, "pre imm", int64(16), in.Imm)
+	in = d.Decode(0x3CC10420, 0) // ldr q0,[x1],#16
+	expect(t, "post WB", 1, in.WB)
+	in = d.Decode(0xADBF07E0, 0) // stp q0,q1,[sp,#-32]!
+	expect(t, "stp pre WB", 3, in.WB)
+	expect(t, "stp pre imm", int64(-32), in.Imm)
+	expect(t, "stp pre width", 16, in.Shift)
+}
+
+// 回写翻译: pre-index 应 emit 基址调整(ADD/SUB_IMM) + V 访存。
+func TestTranslate_SIMDFP_Writeback(t *testing.T) {
+	d := NewDecoder()
+	// stp q0,q1,[sp,#-32]!  (pre-index, imm=-32)
+	in := d.Decode(0xADBF07E0, 0)
+	tr := NewTranslator(0x400000, 0x10)
+	res, err := tr.Translate([]vm.Instruction{in})
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	// 首个操作码应是 SUB_IMM (sp -= 32), 其后是 V_STOREP
+	expect(t, "first op = SUB_IMM", vm.OpSubImm, res.Bytecode[0])
+	foundStP := false
+	pc := 0
+	for pc < res.CodeLen {
+		op := res.Bytecode[pc]
+		sz := vm.InstructionSize(op)
+		if sz == 0 {
+			break
+		}
+		if op == vm.OpVStoreP {
+			foundStP = true
+		}
+		pc += sz
+	}
+	expect(t, "emitted V_STOREP", true, foundStP)
+}
+
 // 验证翻译器 emit: decode→translate→disasm, 确认生成正确的 VM 操作码。
 func TestTranslate_SIMDFP_Emit(t *testing.T) {
 	d := NewDecoder()

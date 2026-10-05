@@ -89,6 +89,34 @@ static inline u32 h_vstorep(vm_ctx_t *vm) {
   return 9;
 }
 
+/* FMOV 寄存器搬运  [5B: op | dir | dst | src | width]
+ * dir=0 vec→vec, 1 gpr→vec, 2 vec→gpr。只搬 width 字节, 目标高位清零。 */
+static inline u32 h_vmov(vm_ctx_t *vm) {
+  u8 dir = vm->bc[vm->pc + 1], dst = vm->bc[vm->pc + 2];
+  u8 src = vm->bc[vm->pc + 3], w = vm->bc[vm->pc + 4];
+  if (dir == 2) { /* vec → gpr: 零扩展 */
+    const u8 *s = vm->V[src & 31];
+    u64 v = 0;
+    for (int i = 0; i < w && i < 8; i++)
+      v |= (u64)s[i] << (i * 8);
+    vm->R[dst & 31] = v;
+  } else {
+    u8 *d = vm->V[dst & 31];
+    for (int i = 0; i < 16; i++)
+      d[i] = 0;
+    if (dir == 1) { /* gpr → vec */
+      u64 v = vm->R[src & 31];
+      for (int i = 0; i < w && i < 8; i++)
+        d[i] = (u8)(v >> (i * 8));
+    } else { /* vec → vec */
+      const u8 *s = vm->V[src & 31];
+      for (int i = 0; i < w; i++)
+        d[i] = s[i];
+    }
+  }
+  return 5;
+}
+
 /* MOVI Vt, #imm128 */
 static inline u32 h_vmovi(vm_ctx_t *vm) {
   u8 vt = vm->bc[vm->pc + 1];
