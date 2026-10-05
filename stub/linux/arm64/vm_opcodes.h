@@ -98,6 +98,13 @@
 #define OP_VMOVI 0x9C /* MOVI Vt,#imm128   18B: [op][vt][val_lo64][val_hi64] */
 #define OP_VMOV 0x30  /* FMOV 寄存器移动   5B: [op][dir][dst][src][width] */
 
+/* ---- 标量浮点运算 (S/D, 值存于 V 低位) ---- */
+#define OP_VF_BIN 0x31  /* 二元 6B: [op][subop][d][n][m][width] (0+ 1- 2* 3/) */
+#define OP_VF_UN 0x32   /* 一元 5B: [op][subop][d][n][width] (0 abs 1 neg 2 sqrt) */
+#define OP_VF_CVT 0x33  /* 转换 6B: [op][kind][d][n][inw][outw] */
+#define OP_VF_CMP 0x34  /* 比较 5B: [op][n][m][width][isZero] */
+#define OP_VF_CSEL 0x35 /* 条件选择 6B: [op][d][n][m][cond][width] */
+
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \
   0x16 /* TBZ  Xt, #bit, target          7B: [op][reg][bit][target32] */

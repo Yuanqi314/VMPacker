@@ -632,6 +632,34 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		return 0, t.trVMov(inst, 2, false, true)
 	case V_FMOV_I:
 		return 0, t.trVMovi(inst)
+	case V_FADD:
+		return 0, t.trVFBin(inst, 0)
+	case V_FSUB:
+		return 0, t.trVFBin(inst, 1)
+	case V_FMUL:
+		return 0, t.trVFBin(inst, 2)
+	case V_FDIV:
+		return 0, t.trVFBin(inst, 3)
+	case V_FABS:
+		return 0, t.trVFUn(inst, 0)
+	case V_FNEG:
+		return 0, t.trVFUn(inst, 1)
+	case V_FSQRT:
+		return 0, t.trVFUn(inst, 2)
+	case V_FCVT_FF:
+		return 0, t.trVFCvt(inst, 0, true, true)
+	case V_FCVT_FS:
+		return 0, t.trVFCvt(inst, 1, false, true)
+	case V_FCVT_FU:
+		return 0, t.trVFCvt(inst, 2, false, true)
+	case V_FCVT_SF:
+		return 0, t.trVFCvt(inst, 3, true, false)
+	case V_FCVT_UF:
+		return 0, t.trVFCvt(inst, 4, true, false)
+	case V_FCMP:
+		return 0, t.trVFCmp(inst)
+	case V_FCSEL:
+		return 0, t.trVFCsel(inst)
 
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")

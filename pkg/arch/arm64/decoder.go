@@ -172,6 +172,21 @@ const (
 	V_FMOV_GV // FMOV Vd, Xn (GPR → 向量)
 	V_FMOV_VG // FMOV Xd, Vn (向量 → GPR)
 	V_FMOV_I  // FMOV Vd, #imm (标量浮点立即数)
+	// 标量浮点运算
+	V_FADD
+	V_FSUB
+	V_FMUL
+	V_FDIV
+	V_FABS
+	V_FNEG
+	V_FSQRT
+	V_FCVT_FF // fcvt 单双精度互转
+	V_FCVT_FS // fcvtzs 浮点→有符号整数
+	V_FCVT_FU // fcvtzu 浮点→无符号整数
+	V_FCVT_SF // scvtf 有符号整数→浮点
+	V_FCVT_UF // ucvtf 无符号整数→浮点
+	V_FCMP
+	V_FCSEL
 	UNSUPPORTED
 )
 
@@ -350,6 +365,11 @@ func OpName(op Op) string {
 		BTI_C: "BTI c", BTI_J: "BTI j", BTI_JC: "BTI jc", BTI: "BTI",
 		V_LDR: "LDR(fp)", V_STR: "STR(fp)", V_LDP: "LDP(fp)", V_STP: "STP(fp)", V_MOVI: "MOVI",
 		V_FMOV_VV: "FMOV(v,v)", V_FMOV_GV: "FMOV(v,r)", V_FMOV_VG: "FMOV(r,v)", V_FMOV_I: "FMOV(imm)",
+		V_FADD: "FADD", V_FSUB: "FSUB", V_FMUL: "FMUL", V_FDIV: "FDIV",
+		V_FABS: "FABS", V_FNEG: "FNEG", V_FSQRT: "FSQRT",
+		V_FCVT_FF: "FCVT", V_FCVT_FS: "FCVTZS", V_FCVT_FU: "FCVTZU",
+		V_FCVT_SF: "SCVTF", V_FCVT_UF: "UCVTF",
+		V_FCMP: "FCMP", V_FCSEL: "FCSEL",
 	}
 	if n, ok := names[op]; ok {
 		return n

@@ -134,6 +134,98 @@ func (t *Translator) trVMov(inst vm.Instruction, dir byte, dstIsV, srcIsV bool) 
 	return nil
 }
 
+// trVFBin 翻译 FP 二元运算 (FADD/FSUB/FMUL/FDIV)。subop: 0+ 1- 2* 3/。
+func (t *Translator) trVFBin(inst vm.Instruction, subop byte) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	m, err := t.vreg(inst.Rm)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVFBin, subop, d, n, m, byte(inst.Shift))
+	return nil
+}
+
+// trVFUn 翻译 FP 一元运算 (FABS/FNEG/FSQRT)。subop: 0 abs 1 neg 2 sqrt。
+func (t *Translator) trVFUn(inst vm.Instruction, subop byte) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVFUn, subop, d, n, byte(inst.Shift))
+	return nil
+}
+
+// trVFCvt 翻译转换。kind: 0 f→f, 1 f→s, 2 f→u, 3 s→f, 4 u→f。
+// dstIsV/srcIsV 指明目标/源是否为向量寄存器 (否则为 GPR)。
+func (t *Translator) trVFCvt(inst vm.Instruction, kind byte, dstIsV, srcIsV bool) error {
+	var d, n byte
+	var err error
+	if dstIsV {
+		d, err = t.vreg(inst.Rd)
+	} else {
+		d, err = t.mapReg(inst.Rd)
+	}
+	if err != nil {
+		return err
+	}
+	if srcIsV {
+		n, err = t.vreg(inst.Rn)
+	} else {
+		n, err = t.mapReg(inst.Rn)
+	}
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVFCvt, kind, d, n, byte(inst.Shift), byte(inst.Imm)) // inw=Shift, outw=Imm
+	return nil
+}
+
+// trVFCmp 翻译 FCMP (置 FL)。
+func (t *Translator) trVFCmp(inst vm.Instruction) error {
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	var m byte
+	if inst.Imm == 0 { // 非零比较才有 Rm
+		m, err = t.vreg(inst.Rm)
+		if err != nil {
+			return err
+		}
+	}
+	t.emit(vm.OpVFCmp, n, m, byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
+// trVFCsel 翻译 FCSEL (d = cond ? n : m)。
+func (t *Translator) trVFCsel(inst vm.Instruction) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	m, err := t.vreg(inst.Rm)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVFCsel, d, n, m, byte(inst.Cond), byte(inst.Shift))
+	return nil
+}
+
 // trVMovi 翻译 MOVI/MVNI — 把 128-bit 立即数写入 V 寄存器。
 func (t *Translator) trVMovi(inst vm.Instruction) error {
 	vt, err := t.vreg(inst.Rd)

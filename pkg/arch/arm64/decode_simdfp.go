@@ -181,22 +181,144 @@ var simdfpPatterns = []InstrPattern{
 		},
 	},
 
-	// ---- FMOV (通用 int↔fp): sf 0011110 ftype 1 rmode=00 opcode=11x 000000 Rn Rd ----
-	// bit16: 1 = GPR→Vec (opcode 111), 0 = Vec→GPR (opcode 110)
+	// ---- 通用 int↔fp 组: sf 0011110 ftype 1 rmode opcode 000000 Rn Rd ----
+	// 覆盖 FMOV(gpr↔vec) + FCVTZS/FCVTZU(浮点→整数) + SCVTF/UCVTF(整数→浮点)
 	{
-		Name: "V_FMOV_GEN", Mask: 0x7F3EFC00, Value: 0x1E260000, Op: V_FMOV_GV,
-		Fields: []FieldDef{{Name: "ftype", Hi: 23, Lo: 22}, {Name: "dir", Hi: 16, Lo: 16}, fRn, fRd},
+		Name: "V_INT_FP", Mask: 0x7F20FC00, Value: 0x1E200000, Op: V_FMOV_GV,
+		Fields: []FieldDef{
+			{Name: "sf", Hi: 31, Lo: 31},
+			{Name: "ftype", Hi: 23, Lo: 22},
+			{Name: "rmode", Hi: 20, Lo: 19},
+			{Name: "opcode", Hi: 18, Lo: 16},
+			fRn, fRd,
+		},
 		Post: func(f map[string]int64, inst *vm.Instruction) {
-			inst.Shift = fpTypeWidth(f["ftype"])
-			if inst.Shift == 0 {
+			fpw := fpTypeWidth(f["ftype"])
+			if fpw == 0 {
 				inst.Op = int(UNSUPPORTED)
 				return
 			}
-			if f["dir"] != 0 {
-				inst.Op = int(V_FMOV_GV) // GPR → Vec
-			} else {
-				inst.Op = int(V_FMOV_VG) // Vec → GPR
+			intw := 4
+			if f["sf"] != 0 {
+				intw = 8
 			}
+			rmode, opc := f["rmode"], f["opcode"]
+			switch {
+			case rmode == 0 && opc == 0b111: // FMOV gpr→vec
+				inst.Op, inst.Shift = int(V_FMOV_GV), fpw
+			case rmode == 0 && opc == 0b110: // FMOV vec→gpr
+				inst.Op, inst.Shift = int(V_FMOV_VG), fpw
+			case rmode == 0b11 && opc == 0b000: // FCVTZS 浮点→有符号整数
+				inst.Op, inst.Shift, inst.Imm = int(V_FCVT_FS), fpw, int64(intw)
+			case rmode == 0b11 && opc == 0b001: // FCVTZU 浮点→无符号整数
+				inst.Op, inst.Shift, inst.Imm = int(V_FCVT_FU), fpw, int64(intw)
+			case rmode == 0 && opc == 0b010: // SCVTF 有符号整数→浮点
+				inst.Op, inst.Shift, inst.Imm = int(V_FCVT_SF), intw, int64(fpw)
+			case rmode == 0 && opc == 0b011: // UCVTF 无符号整数→浮点
+				inst.Op, inst.Shift, inst.Imm = int(V_FCVT_UF), intw, int64(fpw)
+			default:
+				inst.Op = int(UNSUPPORTED) // 其它舍入模式转换暂不支持
+			}
+		},
+	},
+
+	// ---- FP 二元运算: 0001 1110 0 ftype 1 Rm opcode 10 Rn Rd ----
+	// opcode[15:12]: 0000 FMUL, 0001 FDIV, 0010 FADD, 0011 FSUB
+	{
+		Name: "V_FP_2SRC", Mask: 0xFF200C00, Value: 0x1E200800, Op: V_FADD,
+		Fields: []FieldDef{
+			{Name: "ftype", Hi: 23, Lo: 22},
+			fRm16, {Name: "opcode", Hi: 15, Lo: 12}, fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			w := fpTypeWidth(f["ftype"])
+			if w == 0 {
+				inst.Op = int(UNSUPPORTED)
+				return
+			}
+			inst.Shift = w
+			switch f["opcode"] {
+			case 0b0000:
+				inst.Op = int(V_FMUL)
+			case 0b0001:
+				inst.Op = int(V_FDIV)
+			case 0b0010:
+				inst.Op = int(V_FADD)
+			case 0b0011:
+				inst.Op = int(V_FSUB)
+			default:
+				inst.Op = int(UNSUPPORTED) // FMAX/FMIN/FNMUL 等暂不支持
+			}
+		},
+	},
+
+	// ---- FP 一元运算 (FABS/FNEG/FSQRT/FCVT): 0001 1110 0 ftype 1 opcode 10000 Rn Rd ----
+	// 注: FMOV(opcode=000000) 由上面 V_FMOV_RR 先行匹配
+	{
+		Name: "V_FP_1SRC", Mask: 0xFF207C00, Value: 0x1E204000, Op: V_FABS,
+		Fields: []FieldDef{
+			{Name: "ftype", Hi: 23, Lo: 22},
+			{Name: "opcode", Hi: 20, Lo: 15}, fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			w := fpTypeWidth(f["ftype"])
+			if w == 0 {
+				inst.Op = int(UNSUPPORTED)
+				return
+			}
+			inst.Shift = w
+			switch f["opcode"] {
+			case 0b000001:
+				inst.Op = int(V_FABS)
+			case 0b000010:
+				inst.Op = int(V_FNEG)
+			case 0b000011:
+				inst.Op = int(V_FSQRT)
+			case 0b000100: // FCVT → S (目标单精度)
+				inst.Op, inst.Imm = int(V_FCVT_FF), 4
+			case 0b000101: // FCVT → D (目标双精度)
+				inst.Op, inst.Imm = int(V_FCVT_FF), 8
+			default:
+				inst.Op = int(UNSUPPORTED) // FRINTx 等暂不支持
+			}
+		},
+	},
+
+	// ---- FCMP: 0001 1110 0 ftype 1 Rm 00 1000 Rn opc2 ----
+	// opc2[4:0]: 00000 FCMP, 01000 FCMP #0.0 (bit3=1 表示与 0.0 比较)
+	{
+		Name: "V_FCMP", Mask: 0xFF20FC00, Value: 0x1E202000, Op: V_FCMP,
+		Fields: []FieldDef{
+			{Name: "ftype", Hi: 23, Lo: 22},
+			fRm16, {Name: "Rn", Hi: 9, Lo: 5}, {Name: "opc2", Hi: 4, Lo: 0},
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			w := fpTypeWidth(f["ftype"])
+			if w == 0 {
+				inst.Op = int(UNSUPPORTED)
+				return
+			}
+			inst.Shift = w
+			if f["opc2"]&0b01000 != 0 {
+				inst.Imm = 1 // 与 #0.0 比较
+			}
+		},
+	},
+
+	// ---- FCSEL: 0001 1110 0 ftype 1 Rm cond 11 Rn Rd ----
+	{
+		Name: "V_FCSEL", Mask: 0xFF200C00, Value: 0x1E200C00, Op: V_FCSEL,
+		Fields: []FieldDef{
+			{Name: "ftype", Hi: 23, Lo: 22},
+			fRm16, {Name: "cond", Hi: 15, Lo: 12}, fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			w := fpTypeWidth(f["ftype"])
+			if w == 0 {
+				inst.Op = int(UNSUPPORTED)
+				return
+			}
+			inst.Shift = w
 		},
 	},
 

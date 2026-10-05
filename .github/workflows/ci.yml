@@ -83,6 +83,14 @@ jobs:
       - name: go test
         run: go test ./...
 
+      # VM handler 宿主机单元测试 (SIMD&FP 搬运 + 标量浮点), 用原生 gcc 直接跑
+      - name: VM handler unit tests (host)
+        run: |
+          gcc -I stub/linux/arm64 -O1 -o /tmp/tv_simd stub/linux/arm64/test_vsimd_host.c
+          /tmp/tv_simd
+          gcc -I stub/linux/arm64 -O1 -o /tmp/tv_vfp stub/linux/arm64/test_vfp_host.c -lm
+          /tmp/tv_vfp
+
       - name: Build CLI (linux + windows)
         env:
           CGO_ENABLED: '0'

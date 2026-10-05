@@ -89,6 +89,11 @@ var opTable = map[byte]opInfo{
 	OpVStoreP: {"V_STOREP", 9}, // op + vt1 + vt2 + base + imm32 + width
 	OpVMovi:   {"V_MOVI", 18},  // op + vt + val_lo64 + val_hi64
 	OpVMov:    {"V_MOV", 5},    // op + dir + dst + src + width
+	OpVFBin:   {"VF_BIN", 6},   // op + subop + d + n + m + width
+	OpVFUn:    {"VF_UN", 5},    // op + subop + d + n + width
+	OpVFCvt:   {"VF_CVT", 6},   // op + kind + d + n + inw + outw
+	OpVFCmp:   {"VF_CMP", 5},   // op + n + m + width + isZero
+	OpVFCsel:  {"VF_CSEL", 6},  // op + d + n + m + cond + width
 
 	OpTbz:  {"TBZ", 7}, // op + reg + bit + target32
 	OpTbnz: {"TBNZ", 7},

@@ -103,6 +103,21 @@ const (
 	//   dir=0 vec→vec, 1 gpr→vec, 2 vec→gpr; 仅搬 width 字节, 目标高位清零
 	OpVMov byte = 0x30
 
+	// ============================================================
+	// 标量浮点运算 (S=4字节 / D=8字节, 值存于 V 寄存器低位)
+	// ============================================================
+	// 二元: [op][subop][d][n][m][width] = 6B  (subop: 0+ 1- 2* 3/)
+	OpVFBin byte = 0x31
+	// 一元: [op][subop][d][n][width] = 5B      (subop: 0 abs 1 neg 2 sqrt)
+	OpVFUn byte = 0x32
+	// 转换: [op][kind][d][n][inw][outw] = 6B
+	//   kind: 0 f→f, 1 f→s(有符号int), 2 f→u(无符号int), 3 s→f, 4 u→f
+	OpVFCvt byte = 0x33
+	// 比较: [op][n][m][width][isZero] = 5B  (置 FL; isZero=1 时与 0.0 比较)
+	OpVFCmp byte = 0x34
+	// 条件选择: [op][d][n][m][cond][width] = 6B  (d = cond?n:m)
+	OpVFCsel byte = 0x35
+
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target
 	OpTbnz byte = 0x17 // TBNZ Xt, #bit, target

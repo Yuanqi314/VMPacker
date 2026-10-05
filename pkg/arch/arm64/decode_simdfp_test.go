@@ -113,6 +113,83 @@ func TestTranslate_SIMDFP_Writeback(t *testing.T) {
 	expect(t, "emitted V_STOREP", true, foundStP)
 }
 
+// 标量浮点运算解码 (objdump 核对)。
+func TestDecode_SIMDFP_FPArith(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw  uint32
+		op   Op
+		w    int // Shift
+		imm  int64
+		cond int
+	}{
+		{0x1E222820, V_FADD, 4, 0, 0},    // fadd s0,s1,s2
+		{0x1E622820, V_FADD, 8, 0, 0},    // fadd d
+		{0x1E223820, V_FSUB, 4, 0, 0},    // fsub s
+		{0x1E220820, V_FMUL, 4, 0, 0},    // fmul s
+		{0x1E221820, V_FDIV, 4, 0, 0},    // fdiv s
+		{0x1E20C020, V_FABS, 4, 0, 0},    // fabs s
+		{0x1E214020, V_FNEG, 4, 0, 0},    // fneg s
+		{0x1E21C020, V_FSQRT, 4, 0, 0},   // fsqrt s
+		{0x1E22C020, V_FCVT_FF, 4, 8, 0}, // fcvt d,s (in=S out=D)
+		{0x1E380020, V_FCVT_FS, 4, 4, 0}, // fcvtzs w,s
+		{0x9E780020, V_FCVT_FS, 8, 8, 0}, // fcvtzs x,d
+		{0x1E390020, V_FCVT_FU, 4, 4, 0}, // fcvtzu w,s
+		{0x1E220020, V_FCVT_SF, 4, 4, 0}, // scvtf s,w
+		{0x9E620020, V_FCVT_SF, 8, 8, 0}, // scvtf d,x
+		{0x1E230020, V_FCVT_UF, 4, 4, 0}, // ucvtf s,w
+		{0x1E222020, V_FCMP, 4, 0, 0},    // fcmp s1,s2
+		{0x1E202028, V_FCMP, 4, 1, 0},    // fcmp s1,#0.0 (isZero=1)
+		{0x1E220C20, V_FCSEL, 4, 0, 0},   // fcsel s,eq
+		{0x1E621C20, V_FCSEL, 8, 0, 1},   // fcsel d,ne
+	}
+	for _, c := range cases {
+		in := d.Decode(c.raw, 0)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "width", c.w, in.Shift)
+		expect(t, "imm", c.imm, in.Imm)
+		expect(t, "cond", c.cond, in.Cond)
+	}
+}
+
+// FP 运算翻译 emit: 确认生成对应的 VM 操作码。
+func TestTranslate_SIMDFP_FPArith(t *testing.T) {
+	d := NewDecoder()
+	insts := []vm.Instruction{
+		d.Decode(0x1E622820, 0), // fadd d0,d1,d2
+		d.Decode(0x1E61C020, 4), // fsqrt d0,d1
+		d.Decode(0x1E622020, 8), // fcmp d1,d2
+	}
+	tr := NewTranslator(0x400000, 0x20)
+	res, err := tr.Translate(insts)
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	expect(t, "all translated", 3, res.TransInsts)
+	gotBin, gotUn, gotCmp := false, false, false
+	pc := 0
+	for pc < res.CodeLen {
+		op := res.Bytecode[pc]
+		sz := vm.InstructionSize(op)
+		if sz == 0 {
+			break
+		}
+		switch op {
+		case vm.OpVFBin:
+			gotBin = true
+		case vm.OpVFUn:
+			gotUn = true
+		case vm.OpVFCmp:
+			gotCmp = true
+		}
+		pc += sz
+	}
+	expect(t, "emitted VF_BIN", true, gotBin)
+	expect(t, "emitted VF_UN", true, gotUn)
+	expect(t, "emitted VF_CMP", true, gotCmp)
+}
+
 // 验证翻译器 emit: decode→translate→disasm, 确认生成正确的 VM 操作码。
 func TestTranslate_SIMDFP_Emit(t *testing.T) {
 	d := NewDecoder()

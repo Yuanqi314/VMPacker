@@ -163,6 +163,13 @@ static inline u8 vm_insn_size(u8 op) {
     return 18;
   case OP_VMOV:
     return 5;
+  case OP_VF_UN:
+  case OP_VF_CMP:
+    return 5;
+  case OP_VF_BIN:
+  case OP_VF_CVT:
+  case OP_VF_CSEL:
+    return 6;
   default:
     return 0;
   }
