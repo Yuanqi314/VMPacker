@@ -1,0 +1,87 @@
+# ============================================================
+# CI — 每次 push 到 master / 每个 PR 自动构建 + 测试
+#
+# 与 build.yml (仅 tag v* 触发的发布流水线) 分工:
+#   - ci.yml    : 快速反馈 — 编译 stub + go vet + go test + CLI 构建
+#   - build.yml : 发布产物 — CLI/GUI 多平台 + NSIS + GitHub Release
+#
+# stub 的 blob 生成沿用 build.yml 的 Linux 版 (bash + python3)，
+# 因为 Makefile 的 stub 目标是 Windows/PowerShell 专用，无法在 CI 跑。
+# ============================================================
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build & Test (linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ARM64 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      # ── 编译 ARM64 VM 解释器 blob (与 build.yml 一致) ──
+      - name: Compile VM stub
+        run: |
+          mkdir -p build/stub
+          aarch64-linux-gnu-gcc \
+            -c -Os -mcmodel=tiny -fno-stack-protector \
+            -fno-builtin -nostdlib -march=armv8-a \
+            -DVM_INDIRECT_DISPATCH -DVM_FUNC_SPLIT -DVM_TOKEN_ENTRY \
+            stub/linux/arm64/vm_interp.c -o build/stub/vm_interp.o
+
+          aarch64-linux-gnu-ld -T stub/linux/arm64/vm_interp.lds \
+            -o build/stub/vm_interp.elf build/stub/vm_interp.o
+
+          aarch64-linux-gnu-objcopy -O binary \
+            build/stub/vm_interp.elf build/vm_interp_raw.bin
+
+      - name: Generate blob with symbol header
+        run: |
+          python3 << 'PYEOF'
+          import struct, subprocess
+          nm = subprocess.check_output(
+              ['aarch64-linux-gnu-nm', 'build/stub/vm_interp.elf']
+          ).decode()
+
+          def find_sym(name):
+              for line in nm.splitlines():
+                  parts = line.split()
+                  if len(parts) >= 3 and parts[2] == name:
+                      return int(parts[0], 16)
+              raise ValueError(f'Symbol {name} not found')
+
+          off1 = find_sym('vm_entry')
+          off2 = find_sym('vm_entry_token')
+          off3 = find_sym('_token_table_va')
+          hdr  = struct.pack('<QQQ', off1, off2, off3)
+          raw  = open('build/vm_interp_raw.bin', 'rb').read()
+          blob = hdr + raw
+          # 嵌入位置: cmd/vmpacker/vm_interp.bin (go:embed 目标)
+          open('cmd/vmpacker/vm_interp.bin', 'wb').write(blob)
+          print(f'[+] vm_interp.bin: {len(blob)} bytes')
+          print(f'    vm_entry=0x{off1:X}  vm_entry_token=0x{off2:X}  _token_table_va=0x{off3:X}')
+          PYEOF
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+      - name: go build (CLI)
+        run: go build -o /dev/null ./cmd/vmpacker/
