@@ -83,5 +83,19 @@ jobs:
       - name: go test
         run: go test ./...
 
-      - name: go build (CLI)
-        run: go build -o /dev/null ./cmd/vmpacker/
+      - name: Build CLI (linux + windows)
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p dist
+          GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags="-s -w" \
+            -o dist/vmpacker-linux-amd64        ./cmd/vmpacker/
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" \
+            -o dist/vmpacker-windows-amd64.exe  ./cmd/vmpacker/
+          ls -la dist/
+
+      # 每次 push/PR 都留下可下载的 vmpacker 成品 (Actions run → Artifacts)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vmpacker-cli
+          path: dist/vmpacker-*
