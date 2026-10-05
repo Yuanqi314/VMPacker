@@ -15,7 +15,30 @@ func (t *Translator) trBranch(inst vm.Instruction) error {
 	target := inst.Offset + int(inst.Imm)
 
 	if target < 0 || target > t.funcSize {
-		return fmt.Errorf("分支目标 0x%X 超出函数范围 [0, 0x%X)", target, t.funcSize)
+		// 目标落在函数体之外 —— 这是一次跨函数的直接跳转。无条件 B 在
+		// ARM64 中是终结性控制转移，编译器通常把以下几种情况生成为 B 而非 BL：
+		//   - 尾调用           return foo(args)  →  B foo
+		//   - noreturn 调用     __stack_chk_fail / abort
+		//   - 冷块外联          .text.unlikely 里的分支
+		// 这些都等价于“以当前参数寄存器(X0-X7)转移到目标、且不再返回本函数”。
+		// 因此翻译为：原生调用绝对目标 + RET 返回其结果。对真正的尾调用，
+		// 返回值在 X0、控制权回到原始调用者，语义一致；对 noreturn 调用，
+		// native 调用不会返回，后面的 RET 为死代码（无害）。
+		//
+		// 这与寄存器间接跳转 BR Xn 在解释器中的既有处理一致
+		// (stub h_br_reg：目标在函数外时按 native 尾调用处理)，只是对直接 B
+		// 在翻译期即可确定目标，故在此处静态展开。
+		//
+		// 仅限无条件 B；条件分支 (B.cond/CBZ/TBZ) 的越界目标仍按错误处理，
+		// 因为它们越界更可能是“函数大小判定过小”而非真正的尾调用。
+		absTarget := uint64(int64(t.funcAddr) + int64(inst.Offset) + inst.Imm)
+		t.emit(vm.OpCallNative)
+		t.emitU64(absTarget)
+		t.emit(vm.OpRet, 0)
+		t.tailCalls = append(t.tailCalls, fmt.Sprintf(
+			"偏移 0x%04X: B → 原生尾调用 0x%X (跨函数直接跳转)",
+			inst.Offset, absTarget))
+		return nil
 	}
 
 	t.emit(vm.OpJmp)

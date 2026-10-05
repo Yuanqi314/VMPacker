@@ -112,12 +112,26 @@ func NewPacker(input, output string, funcs []string, addrSpecs []AddrSpec, verbo
 }
 
 // FindFunction 在 ELF 中查找函数
+//
+// 优先读取静态符号表 .symtab；若不存在（例如被 strip 的 .so），
+// 回退到动态符号表 .dynsym（导出符号如 JNI_OnLoad 仍在其中）。
+// 行为与 GUI 后端 vmp-gui/backend/api/engine.go 的 AnalyzeELF 保持一致。
 func (p *Packer) FindFunction(f *elf.File, name string) (*vm.FuncInfo, error) {
 	syms, err := f.Symbols()
 	if err != nil {
-		return nil, fmt.Errorf("reading symbol table failed: %v", err)
+		// .symtab 缺失：回退到 .dynsym
+		dynSyms, dynErr := f.DynamicSymbols()
+		if dynErr != nil {
+			return nil, fmt.Errorf("reading symbol table failed (无 .symtab 且无 .dynsym): %v", err)
+		}
+		syms = dynSyms
 	}
 	for _, sym := range syms {
+		// 跳过未定义（导入）符号：它们 Value=0、Section=SHN_UNDEF，
+		// 不是本文件内可提取的函数体。
+		if sym.Section == elf.SHN_UNDEF {
+			continue
+		}
 		if sym.Name == name && elf.ST_TYPE(sym.Info) == elf.STT_FUNC {
 			info := &vm.FuncInfo{
 				Name: sym.Name,
@@ -359,6 +373,15 @@ func (p *Packer) Process() error {
 
 		fmt.Printf("    Translated: %d/%d\n", result.TransInsts, result.TotalInsts)
 		fmt.Printf("    Bytecode: %d bytes\n", len(result.Bytecode))
+
+		// 跨函数尾调用提示 (越界 B 已翻译为原生尾调用)。
+		// 始终打印, 便于用户核对是否为真实尾调用/noreturn, 而非函数大小判定过小。
+		if len(result.TailCalls) > 0 {
+			fmt.Printf("    [i] 跨函数尾调用 (%d) — 已翻译为原生尾调用, 请核对函数边界:\n", len(result.TailCalls))
+			for _, tc := range result.TailCalls {
+				fmt.Printf("        %s\n", tc)
+			}
+		}
 
 		if len(result.Unsupported) > 0 {
 			fmt.Printf("    [!] Unsupported (%d):\n", len(result.Unsupported))

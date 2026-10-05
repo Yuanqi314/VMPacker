@@ -33,6 +33,7 @@ type TranslateResult struct {
 	Bytecode    []byte   // 生成的 VM 字节码 (含 trailer)
 	CodeLen     int      // 纯字节码长度 (不含 trailer，用于 opcode 加密范围)
 	Unsupported []string // 不支持的指令列表
+	TailCalls   []string // 被翻译为原生尾调用的跨函数直接跳转 (B 越界目标)
 	TotalInsts  int      // 总指令数
 	TransInsts  int      // 已翻译指令数
 }
@@ -54,6 +55,7 @@ type Translator struct {
 	funcSize    int           // 原函数大小（字节）
 	funcAddr    uint64        // 原函数起始地址
 	unsupported []string
+	tailCalls   []string     // 越界 B 被翻译为原生尾调用的记录
 	decoder     *Decoder     // 解码器引用（用于名称查找）
 	debug       bool         // debug 模式
 	debugLog    []DebugEntry // debug 对照记录
@@ -219,6 +221,7 @@ func (t *Translator) Translate(instructions []vm.Instruction) (*TranslateResult,
 
 	result.Bytecode = t.code
 	result.Unsupported = t.unsupported
+	result.TailCalls = t.tailCalls
 	return result, nil
 }
 
