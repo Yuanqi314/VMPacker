@@ -17,6 +17,7 @@ typedef short i16;
 
 /* ---- VM 配置常量 ---- */
 #define VM_REG_COUNT 32        /* X0-X30, X31=SP */
+#define VM_VREG_COUNT 32       /* V0-V31 (SIMD&FP, 128-bit) */
 #define VM_STACK_SIZE 32       /* PUSH/POP 操作栈深度 */
 #define VM_EVAL_STACK_SIZE 256 /* 栈机器操作栈深度 */
 #define VM_MEM_STACK 16384     /* 内存栈 (SP 指向的空间, 16KB) */
@@ -41,6 +42,9 @@ typedef struct {
 typedef struct {
   /* 寄存器文件: R[0]-R[30] = X0-X30, R[31] = SP */
   u64 R[VM_REG_COUNT];
+
+  /* SIMD&FP 寄存器文件: V[0]-V[31], 每个 128-bit (小端字节序存储) */
+  u8 V[VM_VREG_COUNT][16];
 
   /* 条件标志 */
   u32 FL;
@@ -89,6 +93,11 @@ static inline void vm_ctx_init(vm_ctx_t *vm, u64 *args, u8 *bytecode, u32 len) {
   /* 清零所有寄存器 */
   for (int i = 0; i < VM_REG_COUNT; i++)
     vm->R[i] = 0;
+
+  /* 清零所有 SIMD&FP 寄存器 */
+  for (int i = 0; i < VM_VREG_COUNT; i++)
+    for (int j = 0; j < 16; j++)
+      vm->V[i][j] = 0;
 
   /* 从 args 指针恢复参数寄存器 X0-X7 */
   for (int i = 0; i < 8; i++)

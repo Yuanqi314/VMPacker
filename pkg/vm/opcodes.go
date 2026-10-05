@@ -87,6 +87,19 @@ const (
 	OpVld16 byte = 0xC1 // vtmp ← mem[R[rn]], len bytes
 	OpVst16 byte = 0xC2 // mem[R[rn]] ← vtmp, len bytes
 
+	// SIMD&FP 寄存器访存 (V0-V31, 128-bit)
+	// LDR/STR (SIMD&FP) 单寄存器:  [op][vt][base][imm32_LE][width] = 8B
+	//   V[vt] ← *(base+imm) / *(base+imm) ← V[vt], 共 width 字节 (1/2/4/8/16)
+	OpVLoad  byte = 0x98
+	OpVStore byte = 0x99
+	// LDP/STP (SIMD&FP) 寄存器对: [op][vt1][vt2][base][imm32_LE][width] = 9B
+	//   元素1 @ base+imm, 元素2 @ base+imm+width, 每个 width 字节 (4/8/16)
+	OpVLoadP  byte = 0x9A
+	OpVStoreP byte = 0x9B
+	// MOVI (SIMD&FP 立即数): [op][vt][val_lo64_LE][val_hi64_LE] = 18B
+	//   V[vt] ← 128-bit 立即数 (由翻译器展开 AdvSIMDExpandImm)
+	OpVMovi byte = 0x9C
+
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target
 	OpTbnz byte = 0x17 // TBNZ Xt, #bit, target

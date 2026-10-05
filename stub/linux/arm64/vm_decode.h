@@ -152,6 +152,15 @@ static inline u8 vm_insn_size(u8 op) {
     return 5;
   case OP_S_PUSH_IMM64:
     return 9;
+  /* ---- SIMD&FP 寄存器访存 ---- */
+  case OP_VLOAD:
+  case OP_VSTORE:
+    return 8;
+  case OP_VLOADP:
+  case OP_VSTOREP:
+    return 9;
+  case OP_VMOVI:
+    return 18;
   default:
     return 0;
   }

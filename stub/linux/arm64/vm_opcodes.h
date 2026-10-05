@@ -88,6 +88,15 @@
 #define OP_VLD16 0xC1 /* LD1 {Vn.16B}, [Xn]            3B: [op][rn][len] */
 #define OP_VST16 0xC2 /* ST1 {Vn.16B}, [Xn]            3B: [op][rn][len] */
 
+/* ---- SIMD&FP 寄存器访存 (V0-V31, 128-bit) ---- */
+#define OP_VLOAD 0x98  /* LDR Vt,[Xb,#imm]   8B: [op][vt][base][imm32][width] */
+#define OP_VSTORE 0x99 /* STR Vt,[Xb,#imm]   8B: [op][vt][base][imm32][width] */
+#define OP_VLOADP                                                              \
+  0x9A /* LDP Vt1,Vt2,[Xb,#imm]  9B: [op][vt1][vt2][base][imm32][width] */
+#define OP_VSTOREP                                                             \
+  0x9B /* STP Vt1,Vt2,[Xb,#imm]  9B: [op][vt1][vt2][base][imm32][width] */
+#define OP_VMOVI 0x9C /* MOVI Vt,#imm128   18B: [op][vt][val_lo64][val_hi64] */
+
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \
   0x16 /* TBZ  Xt, #bit, target          7B: [op][reg][bit][target32] */

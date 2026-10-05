@@ -248,6 +248,23 @@ __attribute__((noinline)) VM_SECTION_MEM static u32 hw_vst16(vm_ctx_t *vm) {
   return h_vst16(vm);
 }
 
+/* ---- SIMD&FP 访存 (V 寄存器) ---- */
+__attribute__((noinline)) VM_SECTION_MEM static u32 hw_vload(vm_ctx_t *vm) {
+  return h_vload(vm);
+}
+__attribute__((noinline)) VM_SECTION_MEM static u32 hw_vstore(vm_ctx_t *vm) {
+  return h_vstore(vm);
+}
+__attribute__((noinline)) VM_SECTION_MEM static u32 hw_vloadp(vm_ctx_t *vm) {
+  return h_vloadp(vm);
+}
+__attribute__((noinline)) VM_SECTION_MEM static u32 hw_vstorep(vm_ctx_t *vm) {
+  return h_vstorep(vm);
+}
+__attribute__((noinline)) VM_SECTION_MEM static u32 hw_vmovi(vm_ctx_t *vm) {
+  return h_vmovi(vm);
+}
+
 /* ---- TBZ/TBNZ (分支, 返回 0) ---- */
 __attribute__((noinline)) VM_SECTION_BRANCH static u32 hw_tbz(vm_ctx_t *vm) {
   h_tbz(vm);
@@ -548,6 +565,13 @@ __attribute__((noinline)) static void vm_init_jump_table(vm_handler_fn *tbl) {
   /* SIMD */
   tbl[OP_VLD16] = hw_vld16;
   tbl[OP_VST16] = hw_vst16;
+
+  /* SIMD&FP 寄存器访存 */
+  tbl[OP_VLOAD] = hw_vload;
+  tbl[OP_VSTORE] = hw_vstore;
+  tbl[OP_VLOADP] = hw_vloadp;
+  tbl[OP_VSTOREP] = hw_vstorep;
+  tbl[OP_VMOVI] = hw_vmovi;
 
   /* TBZ/TBNZ */
   tbl[OP_TBZ] = hw_tbz;

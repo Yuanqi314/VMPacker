@@ -27,6 +27,7 @@
 #include "vm_handlers/h_stack.h"  /* PUSH, POP */
 #include "vm_handlers/h_stack_ops.h" /* 栈机器操作 handler (VLOAD/VSTORE/VADD...) */
 #include "vm_handlers/h_system.h" /* NOP, CALL_NAT, BR_REG, VLD16, VST16 */
+#include "vm_handlers/h_vsimd.h"  /* SIMD&FP 访存: V_LOAD/V_STORE/V_LDP/V_STP/V_MOVI */
 
 
 /* ---- 间接 Dispatch 跳转表 (条件编译) ---- */

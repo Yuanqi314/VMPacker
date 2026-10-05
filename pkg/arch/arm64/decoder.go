@@ -162,6 +162,12 @@ const (
 	BTI_J
 	BTI_JC
 	BTI
+	// SIMD&FP 访存 + MOVI (数据搬运子集)
+	V_LDR  // LDR (SIMD&FP) 单寄存器
+	V_STR  // STR (SIMD&FP) 单寄存器
+	V_LDP  // LDP (SIMD&FP) 寄存器对
+	V_STP  // STP (SIMD&FP) 寄存器对
+	V_MOVI // MOVI (AdvSIMD 立即数)
 	UNSUPPORTED
 )
 
@@ -211,9 +217,16 @@ func (d *Decoder) Decode(raw uint32, offset int) vm.Instruction {
 	case op0>>1 == 0b101:
 		matched = matchAndDecode(raw, branchPatterns, &inst)
 	case op0&0b0101 == 0b0100:
+		// 加载/存储组: 整数在前, 不匹配再尝试 SIMD&FP 访存 (V=1)
 		matched = matchAndDecode(raw, ldstPatterns, &inst)
+		if !matched {
+			matched = matchAndDecode(raw, simdfpPatterns, &inst)
+		}
 	case op0&0b0111 == 0b0101, op0 == 0b1101:
 		matched = matchAndDecode(raw, dpRegPatterns, &inst)
+	case op0 == 0b0111, op0 == 0b1111:
+		// SIMD&FP 数据处理组 (MOVI 等)
+		matched = matchAndDecode(raw, simdfpPatterns, &inst)
 	}
 
 	if !matched {
@@ -331,6 +344,7 @@ func OpName(op Op) string {
 		LDPSW: "LDPSW", LDADD: "LDADD", CAS: "CAS",
 		PACIASP: "PACIASP", AUTIASP: "AUTIASP", PACIAZ: "PACIAZ", AUTIAZ: "AUTIAZ", PACIBSP: "PACIBSP", AUTIBSP: "AUTIBSP", XPACLRI: "XPACLRI",
 		BTI_C: "BTI c", BTI_J: "BTI j", BTI_JC: "BTI jc", BTI: "BTI",
+		V_LDR: "LDR(fp)", V_STR: "STR(fp)", V_LDP: "LDP(fp)", V_STP: "STP(fp)", V_MOVI: "MOVI",
 	}
 	if n, ok := names[op]; ok {
 		return n

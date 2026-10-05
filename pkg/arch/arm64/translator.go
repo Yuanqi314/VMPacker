@@ -613,6 +613,18 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		t.emit(vm.OpNop)
 		return 0, nil
 
+	// ========== SIMD&FP 访存 + MOVI (数据搬运子集) ==========
+	case V_LDR:
+		return 0, t.trVLoadStore(inst, true)
+	case V_STR:
+		return 0, t.trVLoadStore(inst, false)
+	case V_LDP:
+		return 0, t.trVLoadStorePair(inst, true)
+	case V_STP:
+		return 0, t.trVLoadStorePair(inst, false)
+	case V_MOVI:
+		return 0, t.trVMovi(inst)
+
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")
 	}
