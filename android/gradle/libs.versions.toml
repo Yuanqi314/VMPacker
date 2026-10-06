@@ -15,8 +15,10 @@ miuix-ui = { group = "top.yukonga.miuix.kmp", name = "miuix-ui", version.ref = "
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
+# AGP 9.0+ has built-in Kotlin: the org.jetbrains.kotlin.android plugin is no
+# longer applied (AGP compiles Kotlin itself). The Kotlin Gradle Plugin version
+# is forced to `kotlin` via the root build's buildscript classpath, and the
+# Compose compiler plugin is applied without a version so it resolves from it.
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
