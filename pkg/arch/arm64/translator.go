@@ -696,6 +696,19 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		return 0, t.trVFMAdd(inst, 2)
 	case V_FNMSUB:
 		return 0, t.trVFMAdd(inst, 3)
+	// NEON lane 搬运
+	case V_DUP_E:
+		return 0, t.trVDupElem(inst)
+	case V_DUP_G:
+		return 0, t.trVDupGen(inst)
+	case V_UMOV:
+		return 0, t.trVMovToR(inst, 0)
+	case V_SMOV:
+		return 0, t.trVMovToR(inst, 1)
+	case V_INS_G:
+		return 0, t.trVInsGen(inst)
+	case V_INS_E:
+		return 0, t.trVInsElem(inst)
 
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")

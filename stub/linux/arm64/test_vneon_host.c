@@ -89,6 +89,81 @@ int main(void) {
     CHECK(vn_rdf(vm.V[0], 0) == 0.75f && vn_rdf(vm.V[0], 4) == 3.0f, "vfmul 4s lanes");
   }
 
+  /* ---- DUP 元素: v0.4s 各 lane = v1.s[2] ---- */
+  {
+    for (int i = 0; i < 4; i++) setlane(1, i * 4, 4, 11 * (i + 1)); /* 11,22,33,44 */
+    bc[0] = OP_V_DUP_E; bc[1] = 0; bc[2] = 1; bc[3] = 4; bc[4] = 2; bc[5] = 16;
+    vm.pc = 0;
+    u32 sz = h_vdupe(&vm);
+    CHECK(sz == 6, "vdupe size 6");
+    CHECK(getlane(0, 0, 4) == 33 && getlane(0, 4, 4) == 33 &&
+          getlane(0, 8, 4) == 33 && getlane(0, 12, 4) == 33, "dup v0.4s, v1.s[2]");
+    /* Q=0 (.2s) 清零高 8 字节 */
+    bc[5] = 8; vm.pc = 0; h_vdupe(&vm);
+    int hz = 1; for (int i = 8; i < 16; i++) if (vm.V[0][i]) hz = 0;
+    CHECK(hz, "dup Q=0 zeroes upper 8 bytes");
+  }
+  /* ---- DUP 通用: v0.4s 各 lane = R[1]; es 截断 ---- */
+  {
+    vm.R[1] = 0x1122334455667788ULL;
+    bc[0] = OP_V_DUP_G; bc[1] = 0; bc[2] = 1; bc[3] = 4; bc[4] = 16;
+    vm.pc = 0;
+    u32 sz = h_vdupg(&vm);
+    CHECK(sz == 5, "vdupg size 5");
+    CHECK(getlane(0, 0, 4) == 0x55667788 && getlane(0, 12, 4) == 0x55667788,
+          "dup v0.4s, w1 (低 32 位复制)");
+    vm.R[1] = 0x1FF;
+    bc[3] = 1; bc[4] = 8; vm.pc = 0; h_vdupg(&vm);
+    CHECK(getlane(0, 0, 1) == 0xFF && getlane(0, 7, 1) == 0xFF, "dup .8b 截断到字节");
+  }
+  /* ---- UMOV: 零扩展 ---- */
+  {
+    setlane(1, 8, 4, 0xDEADBEEF); /* v1.s[2] */
+    bc[0] = OP_V_MOV2R; bc[1] = 0; bc[2] = 1; bc[3] = 4; bc[4] = 2; bc[5] = 0; bc[6] = 0;
+    vm.pc = 0;
+    u32 sz = h_vmov2r(&vm);
+    CHECK(sz == 7, "vmov2r size 7");
+    CHECK(vm.R[0] == 0xDEADBEEFULL, "umov w0, v1.s[2]");
+    setlane(1, 8, 8, 0x1122334455667788ULL); /* v1.d[1] */
+    bc[3] = 8; bc[4] = 1; bc[6] = 1; vm.pc = 0; h_vmov2r(&vm);
+    CHECK(vm.R[0] == 0x1122334455667788ULL, "umov x0, v1.d[1]");
+  }
+  /* ---- SMOV: 符号扩展 ---- */
+  {
+    setlane(1, 0, 1, 0xFF); /* v1.b[0] = -1 */
+    bc[0] = OP_V_MOV2R; bc[1] = 0; bc[2] = 1; bc[3] = 1; bc[4] = 0; bc[5] = 1; bc[6] = 0;
+    vm.pc = 0; h_vmov2r(&vm);
+    CHECK(vm.R[0] == 0xFFFFFFFFULL, "smov w0, v1.b[0] (符号扩展到 32, 高 32 清零)");
+    bc[6] = 1; vm.pc = 0; h_vmov2r(&vm); /* smov x0 */
+    CHECK(vm.R[0] == 0xFFFFFFFFFFFFFFFFULL, "smov x0, v1.b[0] (符号扩展到 64)");
+    setlane(1, 0, 1, 0x7F); bc[6] = 1; vm.pc = 0; h_vmov2r(&vm);
+    CHECK(vm.R[0] == 0x7FULL, "smov x0, v1.b[0]=0x7F (正值)");
+  }
+  /* ---- INS 通用: 仅改目标 lane, 保留其余 ---- */
+  {
+    for (int i = 0; i < 4; i++) setlane(0, i * 4, 4, 0xA0A0A000 + i);
+    vm.R[1] = 0xCAFEBABE;
+    bc[0] = OP_V_INS_G; bc[1] = 0; bc[2] = 1; bc[3] = 4; bc[4] = 1; /* v0.s[1] */
+    vm.pc = 0;
+    u32 sz = h_vinsg(&vm);
+    CHECK(sz == 5, "vinsg size 5");
+    CHECK(getlane(0, 4, 4) == 0xCAFEBABE, "ins v0.s[1], w1");
+    CHECK(getlane(0, 0, 4) == 0xA0A0A000 && getlane(0, 8, 4) == 0xA0A0A002 &&
+          getlane(0, 12, 4) == 0xA0A0A003, "ins 保留其它 lane");
+  }
+  /* ---- INS 元素: v0.s[1] = v1.s[2] ---- */
+  {
+    for (int i = 0; i < 4; i++) setlane(0, i * 4, 4, 0xB0B0B000 + i);
+    setlane(1, 8, 4, 0x12345678); /* v1.s[2] */
+    bc[0] = OP_V_INS_E; bc[1] = 0; bc[2] = 1; bc[3] = 4; bc[4] = 1; bc[5] = 2;
+    vm.pc = 0;
+    u32 sz = h_vinse(&vm);
+    CHECK(sz == 6, "vinse size 6");
+    CHECK(getlane(0, 4, 4) == 0x12345678, "ins v0.s[1], v1.s[2]");
+    CHECK(getlane(0, 0, 4) == 0xB0B0B000 && getlane(0, 12, 4) == 0xB0B0B003,
+          "ins 元素保留其它 lane");
+  }
+
   printf("\n%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);
   return fails ? 1 : 0;
 }

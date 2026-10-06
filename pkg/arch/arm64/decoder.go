@@ -206,6 +206,13 @@ const (
 	V_FMSUB
 	V_FNMADD
 	V_FNMSUB
+	// NEON lane 搬运 (AdvSIMD copy)
+	V_DUP_E // DUP Vd.T, Vn.Ts[index]
+	V_DUP_G // DUP Vd.T, Rn
+	V_UMOV  // UMOV Rd, Vn.Ts[index] (零扩展)
+	V_SMOV  // SMOV Rd, Vn.Ts[index] (符号扩展)
+	V_INS_G // INS Vd.Ts[index], Rn
+	V_INS_E // INS Vd.Ts[idx1], Vn.Ts[idx2]
 	UNSUPPORTED
 )
 
@@ -393,6 +400,8 @@ func OpName(op Op) string {
 		V_VAND: "VAND", V_VBIC: "VBIC", V_VORR: "VORR", V_VORN: "VORN", V_VEOR: "VEOR",
 		V_VNOT: "VNOT", V_VFADD: "VFADD", V_VFSUB: "VFSUB", V_VFMUL: "VFMUL", V_VFDIV: "VFDIV",
 		V_FMADD: "FMADD", V_FMSUB: "FMSUB", V_FNMADD: "FNMADD", V_FNMSUB: "FNMSUB",
+		V_DUP_E: "DUP(e)", V_DUP_G: "DUP(g)", V_UMOV: "UMOV", V_SMOV: "SMOV",
+		V_INS_G: "INS(g)", V_INS_E: "INS(e)",
 	}
 	if n, ok := names[op]; ok {
 		return n

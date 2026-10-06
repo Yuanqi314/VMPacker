@@ -151,4 +151,72 @@ static inline u32 h_vecnot(vm_ctx_t *vm) {
   return 4;
 }
 
+/* ---- NEON lane 搬运 ---- */
+
+/* DUP 元素: [op][d][n][es][index][nbytes]  Vd 各 lane = Vn[index] */
+static inline u32 h_vdupe(vm_ctx_t *vm) {
+  u8 d = vm->bc[vm->pc + 1], n = vm->bc[vm->pc + 2], es = vm->bc[vm->pc + 3];
+  u8 idx = vm->bc[vm->pc + 4], nb = vm->bc[vm->pc + 5];
+  u64 val = vn_rdlane(vm->V[n & 31], idx * es, es);
+  u8 tmp[16];
+  for (int off = 0; off + es <= nb; off += es)
+    vn_wrlane(tmp, off, es, val);
+  vn_commit(vm, d, tmp, nb);
+  return 6;
+}
+
+/* DUP 通用: [op][d][rn][es][nbytes]  Vd 各 lane = R[rn] (截断到 es) */
+static inline u32 h_vdupg(vm_ctx_t *vm) {
+  u8 d = vm->bc[vm->pc + 1], rn = vm->bc[vm->pc + 2];
+  u8 es = vm->bc[vm->pc + 3], nb = vm->bc[vm->pc + 4];
+  u64 mask = (es >= 8) ? ~(u64)0 : (((u64)1 << (es * 8)) - 1);
+  u64 val = vm->R[rn & 31] & mask;
+  u8 tmp[16];
+  for (int off = 0; off + es <= nb; off += es)
+    vn_wrlane(tmp, off, es, val);
+  vn_commit(vm, d, tmp, nb);
+  return 5;
+}
+
+/* UMOV/SMOV: [op][d][n][es][index][sign][sf]  R[d] = 扩展(Vn[index])
+ *   sign 0 零扩展(UMOV) 1 符号扩展(SMOV); sf=0 时结果截断到 32 位 (写 W) */
+static inline u32 h_vmov2r(vm_ctx_t *vm) {
+  u8 d = vm->bc[vm->pc + 1], n = vm->bc[vm->pc + 2], es = vm->bc[vm->pc + 3];
+  u8 idx = vm->bc[vm->pc + 4], sign = vm->bc[vm->pc + 5], sf = vm->bc[vm->pc + 6];
+  u64 raw = vn_rdlane(vm->V[n & 31], idx * es, es);
+  u64 out;
+  if (sign) {
+    int bits = es * 8;
+    if (bits >= 64) {
+      out = raw;
+    } else {
+      u64 m = (u64)1 << (bits - 1);
+      out = (u64)(((i64)(raw ^ m)) - (i64)m); /* 符号扩展 es*8 → 64 */
+    }
+    if (!sf)
+      out &= 0xFFFFFFFFULL; /* 写 W 清零高 32 */
+  } else {
+    out = raw; /* UMOV 零扩展 */
+  }
+  vm->R[d & 31] = out;
+  return 7;
+}
+
+/* INS 通用: [op][d][rn][es][index]  Vd[index] = R[rn] (仅改该 lane) */
+static inline u32 h_vinsg(vm_ctx_t *vm) {
+  u8 d = vm->bc[vm->pc + 1], rn = vm->bc[vm->pc + 2];
+  u8 es = vm->bc[vm->pc + 3], idx = vm->bc[vm->pc + 4];
+  vn_wrlane(vm->V[d & 31], idx * es, es, vm->R[rn & 31]);
+  return 5;
+}
+
+/* INS 元素: [op][d][n][es][didx][sidx]  Vd[didx] = Vn[sidx] (仅改该 lane) */
+static inline u32 h_vinse(vm_ctx_t *vm) {
+  u8 d = vm->bc[vm->pc + 1], n = vm->bc[vm->pc + 2], es = vm->bc[vm->pc + 3];
+  u8 didx = vm->bc[vm->pc + 4], sidx = vm->bc[vm->pc + 5];
+  u64 val = vn_rdlane(vm->V[n & 31], sidx * es, es); /* 先读, 避免 d==n 别名 */
+  vn_wrlane(vm->V[d & 31], didx * es, es, val);
+  return 6;
+}
+
 #endif /* H_VNEON_H */

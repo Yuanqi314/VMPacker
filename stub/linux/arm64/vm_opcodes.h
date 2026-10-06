@@ -114,6 +114,13 @@
 #define OP_VEC_NOT 0x3A   /* 取反     4B: [op][d][n][nbytes] */
 #define OP_VEC_FBIN 0x3B  /* 浮点二元 7B: [op][subop][d][n][m][esize][nbytes] */
 
+/* ---- NEON lane 搬运 (DUP/UMOV/SMOV/INS) ---- */
+#define OP_V_DUP_E 0x3F /* DUP 元素 6B: [op][d][n][es][index][nbytes] */
+#define OP_V_DUP_G 0x40 /* DUP 通用 5B: [op][d][rn][es][nbytes] */
+#define OP_V_MOV2R 0x41 /* UMOV/SMOV 7B: [op][d][n][es][index][sign][sf] */
+#define OP_V_INS_G 0x42 /* INS 通用 5B: [op][d][rn][es][index] */
+#define OP_V_INS_E 0x43 /* INS 元素 6B: [op][d][n][es][didx][sidx] */
+
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \
   0x16 /* TBZ  Xt, #bit, target          7B: [op][reg][bit][target32] */

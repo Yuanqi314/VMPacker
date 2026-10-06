@@ -176,6 +176,96 @@ func (t *Translator) trVFMAdd(inst vm.Instruction, subop byte) error {
 	return nil
 }
 
+// vnbytes: Q (inst.SF) → 向量总字节 (16=full / 8=half)
+func vnbytes(inst vm.Instruction) byte {
+	if inst.SF {
+		return 16
+	}
+	return 8
+}
+
+// trVDupElem 翻译 DUP Vd.T, Vn.Ts[index] (元素复制到各 lane)。
+func (t *Translator) trVDupElem(inst vm.Instruction) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVDupElem, d, n, byte(inst.Shift), byte(inst.Imm), vnbytes(inst))
+	return nil
+}
+
+// trVDupGen 翻译 DUP Vd.T, Rn (GPR 复制到各 lane)。
+func (t *Translator) trVDupGen(inst vm.Instruction) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	rn, err := t.mapReg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	if inst.Rn == vm.REG_XZR {
+		t.sPushImm32(0)
+		t.sVstore(rn) // R16 = 0 (ZR 源)
+	}
+	t.emit(vm.OpVDupGen, d, rn, byte(inst.Shift), vnbytes(inst))
+	return nil
+}
+
+// trVMovToR 翻译 UMOV/SMOV Rd, Vn.Ts[index] (向量 lane → GPR)。sign: 0 零扩展 1 符号扩展。
+func (t *Translator) trVMovToR(inst vm.Instruction, sign byte) error {
+	d, err := t.mapReg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	sf := byte(0)
+	if inst.SF {
+		sf = 1
+	}
+	t.emit(vm.OpVMovToR, d, n, byte(inst.Shift), byte(inst.Imm), sign, sf)
+	return nil
+}
+
+// trVInsGen 翻译 INS Vd.Ts[index], Rn (GPR → 向量 lane)。
+func (t *Translator) trVInsGen(inst vm.Instruction) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	rn, err := t.mapReg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	if inst.Rn == vm.REG_XZR {
+		t.sPushImm32(0)
+		t.sVstore(rn) // R16 = 0 (ZR 源)
+	}
+	t.emit(vm.OpVInsGen, d, rn, byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
+// trVInsElem 翻译 INS Vd.Ts[didx], Vn.Ts[sidx] (向量 lane → 向量 lane)。
+func (t *Translator) trVInsElem(inst vm.Instruction) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVInsElem, d, n, byte(inst.Shift), byte(inst.Imm), byte(inst.Cond))
+	return nil
+}
+
 // trVFUn 翻译 FP 一元运算 (FABS/FNEG/FSQRT)。subop: 0 abs 1 neg 2 sqrt。
 func (t *Translator) trVFUn(inst vm.Instruction, subop byte) error {
 	d, err := t.vreg(inst.Rd)

@@ -180,6 +180,75 @@ func TestDecode_SIMDFP_FMADD(t *testing.T) {
 	}
 }
 
+// NEON lane 搬运解码 (DUP/UMOV/SMOV/INS)。imm5 → es+index, imm4/op/Q → 操作。
+func TestDecode_SIMDFP_Copy(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw  uint32
+		op   Op
+		es   int   // Shift
+		idx  int64 // Imm (主索引)
+		sidx int   // Cond (INS 元素的源索引)
+		sf   bool  // Q
+	}{
+		{0x4E140420, V_DUP_E, 4, 2, 0, true},  // dup v0.4s, v1.s[2]
+		{0x0E070420, V_DUP_E, 1, 3, 0, false}, // dup v0.8b, v1.b[3]
+		{0x4E180420, V_DUP_E, 8, 1, 0, true},  // dup v0.2d, v1.d[1]
+		{0x4E040C20, V_DUP_G, 4, 0, 0, true},  // dup v0.4s, w1
+		{0x0E010C20, V_DUP_G, 1, 0, 0, false}, // dup v0.8b, w1
+		{0x0E073C20, V_UMOV, 1, 3, 0, false},  // umov w0, v1.b[3]
+		{0x4E183C20, V_UMOV, 8, 1, 0, true},   // umov x0, v1.d[1]
+		{0x0E072C20, V_SMOV, 1, 3, 0, false},  // smov w0, v1.b[3]
+		{0x4E062C20, V_SMOV, 2, 1, 0, true},   // smov x0, v1.h[1]
+		{0x4E0C1C20, V_INS_G, 4, 1, 0, true},  // ins v0.s[1], w1
+		{0x4E181C20, V_INS_G, 8, 1, 0, true},  // ins v0.d[1], x1
+		{0x6E0C4420, V_INS_E, 4, 1, 2, true},  // ins v0.s[1], v1.s[2]
+		{0x6E180420, V_INS_E, 8, 1, 0, true},  // ins v0.d[1], v1.d[0]
+	}
+	for _, c := range cases {
+		in := d.Decode(c.raw, 0)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "es", c.es, in.Shift)
+		expect(t, "index", c.idx, in.Imm)
+		expect(t, "sidx", c.sidx, in.Cond)
+		expect(t, "SF(Q)", c.sf, in.SF)
+		expect(t, "Rd", 0, in.Rd)
+	}
+	// DUP 通用 / UMOV 的寄存器号: Rn/Rd 应为 1 / 0
+	in := d.Decode(0x4E040C20, 0) // dup v0.4s, w1
+	expect(t, "DUP_G Rn", 1, in.Rn)
+	in = d.Decode(0x0E073C20, 0) // umov w0, v1.b[3]
+	expect(t, "UMOV Rn(V)", 1, in.Rn)
+	// ZR 源/目标: dup v0.4s, wzr → Rn=REG_XZR; umov wzr,v1.s[0] → Rd=REG_XZR
+	in = d.Decode(0x4E040FE0, 0) // dup v0.4s, wzr (Rn=31)
+	expect(t, "DUP_G wzr Rn", vm.REG_XZR, in.Rn)
+}
+
+// NEON lane 搬运翻译: 整段应无 UNSUPPORTED, 全部成功翻译。
+func TestTranslate_SIMDFP_Copy(t *testing.T) {
+	d := NewDecoder()
+	raws := []uint32{
+		0x4E140420, // dup v0.4s, v1.s[2]
+		0x4E040C20, // dup v0.4s, w1
+		0x0E073C20, // umov w0, v1.b[3]
+		0x4E062C20, // smov x0, v1.h[1]
+		0x4E0C1C20, // ins v0.s[1], w1
+		0x6E0C4420, // ins v0.s[1], v1.s[2]
+		0x4E040FE0, // dup v0.4s, wzr (ZR 源)
+	}
+	insts := make([]vm.Instruction, len(raws))
+	for i, r := range raws {
+		insts[i] = d.Decode(r, i*4)
+	}
+	tr := NewTranslator(0x400000, 0x20)
+	res, err := tr.Translate(insts)
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	expect(t, "all translated", len(raws), res.TransInsts)
+}
+
 // FP 运算翻译 emit: 确认生成对应的 VM 操作码。
 func TestTranslate_SIMDFP_FPArith(t *testing.T) {
 	d := NewDecoder()

@@ -337,6 +337,60 @@ var simdfpPatterns = []InstrPattern{
 		},
 	},
 
+	// ---- AdvSIMD copy: 0 Q op 01110000 imm5 0 imm4 1 Rn Rd ----
+	// 覆盖 DUP(元素/通用) / UMOV / SMOV / INS(通用/元素)
+	{
+		Name: "V_ASIMD_COPY", Mask: 0x9FE08400, Value: 0x0E000400, Op: V_DUP_E,
+		Fields: []FieldDef{
+			{Name: "Q", Hi: 30, Lo: 30}, {Name: "op", Hi: 29, Lo: 29},
+			{Name: "imm5", Hi: 20, Lo: 16}, {Name: "imm4", Hi: 14, Lo: 11},
+			fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			es, index := decodeImm5(f["imm5"])
+			if es == 0 {
+				inst.Op = int(UNSUPPORTED)
+				return
+			}
+			Q, op, imm4 := f["Q"], f["op"], f["imm4"]
+			inst.Shift = es
+			inst.SF = Q == 1
+			inst.Imm = int64(index)
+			if op == 1 {
+				// INS (element): Q 必为 1; imm4 = 源索引 (按 log2(es) 右移)
+				if Q != 1 {
+					inst.Op = int(UNSUPPORTED)
+					return
+				}
+				inst.Op = int(V_INS_E)
+				inst.Cond = int(imm4 >> log2Esize(es)) // 源索引
+				return
+			}
+			switch imm4 {
+			case 0b0000: // DUP (element): Rn/Rd 均为 V 寄存器
+				inst.Op = int(V_DUP_E)
+			case 0b0001: // DUP (general): Rn 为 GPR (31=ZR)
+				inst.Op = int(V_DUP_G)
+				xzrReplace(&inst.Rn)
+			case 0b0101: // SMOV: Rd 为 GPR (31=ZR)
+				inst.Op = int(V_SMOV)
+				xzrReplace(&inst.Rd)
+			case 0b0111: // UMOV: Rd 为 GPR (31=ZR)
+				inst.Op = int(V_UMOV)
+				xzrReplace(&inst.Rd)
+			case 0b0011: // INS (general): Q 必为 1, Rn 为 GPR (31=ZR)
+				if Q != 1 {
+					inst.Op = int(UNSUPPORTED)
+					return
+				}
+				inst.Op = int(V_INS_G)
+				xzrReplace(&inst.Rn)
+			default:
+				inst.Op = int(UNSUPPORTED)
+			}
+		},
+	},
+
 	// ---- FP 融合乘加 (3-source): 0001 1111 0 ftype o1 Rm o0 Ra Rn Rd ----
 	// (o1,o0): (0,0) FMADD  (0,1) FMSUB  (1,0) FNMADD  (1,1) FNMSUB
 	{
@@ -440,6 +494,31 @@ var simdfpPatterns = []InstrPattern{
 			}
 		},
 	},
+}
+
+// decodeImm5 解析 AdvSIMD copy 的 imm5: 最低置位决定元素大小, 其余位为索引。
+// 返回 es=0 表示保留/不支持的编码。
+func decodeImm5(imm5 int64) (es int, index int) {
+	switch {
+	case imm5&1 == 1: // xxxx1 → B (1 字节)
+		return 1, int(imm5 >> 1)
+	case imm5&3 == 2: // xxx10 → H (2 字节)
+		return 2, int(imm5 >> 2)
+	case imm5&7 == 4: // xx100 → S (4 字节)
+		return 4, int(imm5 >> 3)
+	case imm5&15 == 8: // x1000 → D (8 字节)
+		return 8, int(imm5 >> 4)
+	}
+	return 0, 0
+}
+
+// log2Esize: 元素字节 (1/2/4/8) → log2 (0/1/2/3)
+func log2Esize(es int) int {
+	n := 0
+	for e := es; e > 1; e >>= 1 {
+		n++
+	}
+	return n
 }
 
 // fpTypeWidth: ftype(00=S,01=D,11=H) → 字节宽度 (H 暂不支持返回 0)

@@ -134,6 +134,22 @@ const (
 	//   subop 0 madd(a+n*m) 1 msub(a-n*m) 2 nmadd(-a-n*m) 3 nmsub(-a+n*m)
 	OpVFMAdd byte = 0x3E
 
+	// ============================================================
+	// NEON lane 搬运 (DUP / UMOV / SMOV / INS)
+	// esize=lane 字节 (1/2/4/8), nbytes=总字节 (8=half / 16=full)
+	// ============================================================
+	// DUP 元素: [op][d][n][esize][index][nbytes] = 6B  (Vd 各 lane = Vn[index])
+	OpVDupElem byte = 0x3F
+	// DUP 通用: [op][d][rn][esize][nbytes] = 5B        (Vd 各 lane = R[rn])
+	OpVDupGen byte = 0x40
+	// UMOV/SMOV: [op][d][n][esize][index][sign][sf] = 7B  (R[d] = 扩展(Vn[index]))
+	//   sign 0 零扩展(UMOV) 1 符号扩展(SMOV); sf 目标 64 位
+	OpVMovToR byte = 0x41
+	// INS 通用: [op][d][rn][esize][index] = 5B          (Vd[index] = R[rn])
+	OpVInsGen byte = 0x42
+	// INS 元素: [op][d][n][esize][didx][sidx] = 6B      (Vd[didx] = Vn[sidx])
+	OpVInsElem byte = 0x43
+
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target
 	OpTbnz byte = 0x17 // TBNZ Xt, #bit, target
