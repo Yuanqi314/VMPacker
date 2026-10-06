@@ -10,6 +10,22 @@
 # 每次构建用 aarch64 工具链重新生成, 不提交二进制
 cmd/vmpacker/vm_interp.bin
 vmp-gui/backend/api/vm_interp.bin
+mobile/vm_interp.bin
+
+# ============================================================
+# Android 应用 (gomobile + Jetpack Compose) 构建产物
+# ============================================================
+# gomobile bind 生成的 AAR (CI 每次构建重新生成)
+android/app/libs/*.aar
+# Gradle / Android Studio 本地产物
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+*.apk
+*.ap_
 
 # 编译出的 vmpacker 可执行文件
 vmpacker

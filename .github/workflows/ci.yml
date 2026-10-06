@@ -67,8 +67,11 @@ jobs:
           hdr  = struct.pack('<QQQ', off1, off2, off3)
           raw  = open('build/vm_interp_raw.bin', 'rb').read()
           blob = hdr + raw
-          # 嵌入位置: cmd/vmpacker/vm_interp.bin (go:embed 目标)
-          open('cmd/vmpacker/vm_interp.bin', 'wb').write(blob)
+          # 嵌入位置: CLI 与 gomobile 封装都用 go:embed 引用同一 blob
+          import os
+          for dst in ('cmd/vmpacker/vm_interp.bin', 'mobile/vm_interp.bin'):
+              os.makedirs(os.path.dirname(dst), exist_ok=True)
+              open(dst, 'wb').write(blob)
           print(f'[+] vm_interp.bin: {len(blob)} bytes')
           print(f'    vm_entry=0x{off1:X}  vm_entry_token=0x{off2:X}  _token_table_va=0x{off3:X}')
           PYEOF
