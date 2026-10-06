@@ -226,6 +226,11 @@ const (
 	// NEON 向量浮点融合乘加
 	V_VFMLA // Vd += Vn*Vm
 	V_VFMLS // Vd -= Vn*Vm
+	// NEON 向量整数↔浮点转换
+	V_VSCVTF  // int → fp (有符号)
+	V_VUCVTF  // int → fp (无符号)
+	V_VFCVTZS // fp → int (有符号, 向零截断)
+	V_VFCVTZU // fp → int (无符号, 向零截断)
 	UNSUPPORTED
 )
 
@@ -419,6 +424,8 @@ func OpName(op Op) string {
 		V_VCMHS: "CMHS", V_VCMTST: "CMTST",
 		V_VFCMEQ: "FCMEQ", V_VFCMGE: "FCMGE", V_VFCMGT: "FCMGT",
 		V_VFMLA: "FMLA", V_VFMLS: "FMLS",
+		V_VSCVTF: "SCVTF(v)", V_VUCVTF: "UCVTF(v)",
+		V_VFCVTZS: "FCVTZS(v)", V_VFCVTZU: "FCVTZU(v)",
 	}
 	if n, ok := names[op]; ok {
 		return n

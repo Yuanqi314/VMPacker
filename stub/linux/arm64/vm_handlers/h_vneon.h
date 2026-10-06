@@ -69,6 +69,38 @@ static inline i64 vn_sext(u64 v, int es) {
   return (i64)((v ^ m) - m);
 }
 
+/* 浮点→有符号整数 (向零截断, 饱和; NaN→0), 返回 bytes 字节的位模式 */
+static inline u64 vn_f2s(double f, int bytes) {
+  if (f != f)
+    return 0; /* NaN */
+  if (bytes == 4) {
+    if (f >= 2147483647.0)
+      return (u64)(u32)0x7FFFFFFF;
+    if (f <= -2147483648.0)
+      return (u64)(u32)0x80000000;
+    return (u64)(u32)(i32)f;
+  }
+  if (f >= 9223372036854775807.0)
+    return 0x7FFFFFFFFFFFFFFFULL;
+  if (f <= -9223372036854775808.0)
+    return 0x8000000000000000ULL;
+  return (u64)(i64)f;
+}
+
+/* 浮点→无符号整数 (向零截断, 饱和; NaN/负→0) */
+static inline u64 vn_f2u(double f, int bytes) {
+  if (f != f || f <= 0.0)
+    return 0;
+  if (bytes == 4) {
+    if (f >= 4294967295.0)
+      return 0xFFFFFFFFULL;
+    return (u64)(u32)f;
+  }
+  if (f >= 18446744073709551615.0)
+    return 0xFFFFFFFFFFFFFFFFULL;
+  return (u64)f;
+}
+
 /* 写回 tmp[0..nb) 到 V[d], 并清零高位 (nb..16) */
 static inline void vn_commit(vm_ctx_t *vm, u8 d, const u8 *tmp, int nb) {
   u8 *pd = vm->V[d & 31];
@@ -275,6 +307,34 @@ static inline u32 h_vecfma(vm_ctx_t *vm) {
   }
   vn_commit(vm, d, tmp, nb);
   return 7;
+}
+
+/* 向量整数↔浮点转换: [op][subop][d][n][es][nbytes]
+ *   subop 0 SCVTF 1 UCVTF (int→fp)  2 FCVTZS 3 FCVTZU (fp→int, 向零截断/饱和) */
+static inline u32 h_veccvt(vm_ctx_t *vm) {
+  u8 sub = vm->bc[vm->pc + 1], d = vm->bc[vm->pc + 2], n = vm->bc[vm->pc + 3];
+  u8 es = vm->bc[vm->pc + 4], nb = vm->bc[vm->pc + 5];
+  const u8 *pn = vm->V[n & 31];
+  u8 tmp[16];
+  for (int off = 0; off + es <= nb; off += es) {
+    if (es == 8) {
+      switch (sub) {
+      case 0: vn_wrd(tmp, off, (double)(i64)vn_rdlane(pn, off, 8)); break;
+      case 1: vn_wrd(tmp, off, (double)vn_rdlane(pn, off, 8)); break;
+      case 2: vn_wrlane(tmp, off, 8, vn_f2s(vn_rdd(pn, off), 8)); break;
+      case 3: vn_wrlane(tmp, off, 8, vn_f2u(vn_rdd(pn, off), 8)); break;
+      }
+    } else { /* es == 4 */
+      switch (sub) {
+      case 0: vn_wrf(tmp, off, (float)(i32)(u32)vn_rdlane(pn, off, 4)); break;
+      case 1: vn_wrf(tmp, off, (float)(u32)vn_rdlane(pn, off, 4)); break;
+      case 2: vn_wrlane(tmp, off, 4, vn_f2s(vn_rdf(pn, off), 4)); break;
+      case 3: vn_wrlane(tmp, off, 4, vn_f2u(vn_rdf(pn, off), 4)); break;
+      }
+    }
+  }
+  vn_commit(vm, d, tmp, nb);
+  return 6;
 }
 
 /* 浮点比较: [op][subop][d][n][m][es][nbytes]  subop 0 EQ 1 GE 2 GT

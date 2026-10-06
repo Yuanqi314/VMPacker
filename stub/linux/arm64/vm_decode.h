@@ -183,6 +183,7 @@ static inline u8 vm_insn_size(u8 op) {
     return 7;
   case OP_V_DUP_E:
   case OP_V_INS_E:
+  case OP_VEC_CVT:
     return 6;
   case OP_V_DUP_G:
   case OP_V_INS_G:

@@ -130,6 +130,9 @@
 #define OP_VEC_FMA                                                             \
   0x48 /* 向量 FMLA/FMLS 7B: [op][subop][d][n][m][es][nbytes]                  \
           (0 FMLA d+=n*m, 1 FMLS d-=n*m) */
+#define OP_VEC_CVT                                                             \
+  0x4A /* 向量 int↔fp 转换 6B: [op][subop][d][n][es][nbytes]                   \
+          (0 SCVTF 1 UCVTF 2 FCVTZS 3 FCVTZU) */
 
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \

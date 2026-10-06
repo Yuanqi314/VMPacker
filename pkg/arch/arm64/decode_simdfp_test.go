@@ -323,6 +323,40 @@ func TestDecode_SIMDFP_VFma(t *testing.T) {
 	expect(t, "all translated", len(cases), res.TransInsts)
 }
 
+// 向量整数↔浮点转换解码 (SCVTF/UCVTF/FCVTZS/FCVTZU)。
+func TestDecode_SIMDFP_VCvt(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw uint32
+		op  Op
+		es  int
+		nb  int64
+	}{
+		{0x4E21D820, V_VSCVTF, 4, 16},  // scvtf v0.4s
+		{0x6E21D820, V_VUCVTF, 4, 16},  // ucvtf v0.4s
+		{0x4EA1B820, V_VFCVTZS, 4, 16}, // fcvtzs v0.4s
+		{0x6EA1B820, V_VFCVTZU, 4, 16}, // fcvtzu v0.4s
+		{0x4E61D820, V_VSCVTF, 8, 16},  // scvtf v0.2d
+		{0x4EE1B820, V_VFCVTZS, 8, 16}, // fcvtzs v0.2d
+		{0x0E21D820, V_VSCVTF, 4, 8},   // scvtf v0.2s (Q=0)
+	}
+	insts := make([]vm.Instruction, len(cases))
+	for i, c := range cases {
+		in := d.Decode(c.raw, i*4)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "es", c.es, in.Shift)
+		expect(t, "nbytes", c.nb, in.Imm)
+		insts[i] = in
+	}
+	tr := NewTranslator(0x400000, 0x20)
+	res, err := tr.Translate(insts)
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	expect(t, "all translated", len(cases), res.TransInsts)
+}
+
 // FP 运算翻译 emit: 确认生成对应的 VM 操作码。
 func TestTranslate_SIMDFP_FPArith(t *testing.T) {
 	d := NewDecoder()

@@ -244,6 +244,41 @@ int main(void) {
           vn_rdd(vm.V[0], 0) != 0.0, "fmla 融合 (非朴素 mul+add)");
   }
 
+  /* ---- 向量 int↔fp 转换 (v.4s / v.2d) ---- */
+  {
+    /* SCVTF v.4s: [-2, 3, 0, 100] → float */
+    setlane(1, 0, 4, (u32)-2); setlane(1, 4, 4, 3);
+    setlane(1, 8, 4, 0); setlane(1, 12, 4, 100);
+    bc[0] = OP_VEC_CVT; bc[1] = 0; bc[2] = 0; bc[3] = 1; bc[4] = 4; bc[5] = 16;
+    vm.pc = 0;
+    u32 sz = h_veccvt(&vm);
+    CHECK(sz == 6, "veccvt size 6");
+    CHECK(vn_rdf(vm.V[0], 0) == -2.0f && vn_rdf(vm.V[0], 4) == 3.0f &&
+          vn_rdf(vm.V[0], 12) == 100.0f, "scvtf 4s");
+    /* UCVTF: 0xFFFFFFFF → 4294967295.0 */
+    setlane(1, 0, 4, 0xFFFFFFFF);
+    bc[1] = 1; vm.pc = 0; h_veccvt(&vm);
+    CHECK(vn_rdf(vm.V[0], 0) == 4294967295.0f, "ucvtf 4s (无符号)");
+    /* FCVTZS: [2.9, -2.9, 1e30(饱和), NaN→0] */
+    vn_wrf(vm.V[1], 0, 2.9f); vn_wrf(vm.V[1], 4, -2.9f);
+    vn_wrf(vm.V[1], 8, 1e30f); vn_wrf(vm.V[1], 12, __builtin_nanf(""));
+    bc[1] = 2; vm.pc = 0; h_veccvt(&vm);
+    CHECK((i32)getlane(0, 0, 4) == 2 && (i32)getlane(0, 4, 4) == -2, "fcvtzs 4s 向零截断");
+    CHECK(getlane(0, 8, 4) == 0x7FFFFFFF && getlane(0, 12, 4) == 0, "fcvtzs 饱和/NaN→0");
+    /* FCVTZU: [3.7, -1(→0), 1e30(饱和)] */
+    vn_wrf(vm.V[1], 0, 3.7f); vn_wrf(vm.V[1], 4, -1.0f); vn_wrf(vm.V[1], 8, 1e30f);
+    bc[1] = 3; vm.pc = 0; h_veccvt(&vm);
+    CHECK(getlane(0, 0, 4) == 3 && getlane(0, 4, 4) == 0 &&
+          getlane(0, 8, 4) == 0xFFFFFFFF, "fcvtzu 4s (负→0, 饱和)");
+    /* 双精度往返: SCVTF .2d 再 FCVTZS .2d */
+    setlane(1, 0, 8, (u64)(i64)-5); setlane(1, 8, 8, 42);
+    bc[1] = 0; bc[4] = 8; vm.pc = 0; h_veccvt(&vm);
+    CHECK(vn_rdd(vm.V[0], 0) == -5.0 && vn_rdd(vm.V[0], 8) == 42.0, "scvtf 2d");
+    vn_wrd(vm.V[1], 0, -5.0); vn_wrd(vm.V[1], 8, 42.0);
+    bc[1] = 2; vm.pc = 0; h_veccvt(&vm);
+    CHECK((i64)getlane(0, 0, 8) == -5 && (i64)getlane(0, 8, 8) == 42, "fcvtzs 2d");
+  }
+
   printf("\n%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);
   return fails ? 1 : 0;
 }

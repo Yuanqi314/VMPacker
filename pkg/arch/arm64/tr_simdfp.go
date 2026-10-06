@@ -399,6 +399,20 @@ func (t *Translator) trVecFma(inst vm.Instruction, subop byte) error {
 	return nil
 }
 
+// trVecCvt 翻译向量整数↔浮点转换。subop: 0 SCVTF 1 UCVTF 2 FCVTZS 3 FCVTZU。
+func (t *Translator) trVecCvt(inst vm.Instruction, subop byte) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecCvt, subop, d, n, byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
 func (t *Translator) trVecNot(inst vm.Instruction) error {
 	d, err := t.vreg(inst.Rd)
 	if err != nil {

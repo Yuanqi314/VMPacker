@@ -525,6 +525,45 @@ var simdfpPatterns = []InstrPattern{
 			}
 		},
 	},
+
+	// ---- ASIMD 2-reg misc: 整数↔浮点转换 ----
+	// 0 Q U 01110 size 10000 opcode 10 Rn Rd
+	//   SCVTF/UCVTF (opcode 11101, int→fp), FCVTZS/FCVTZU (opcode 11011, fp→int)
+	// 宽解码 (匹配 2-reg-misc 固定位), 非转换 opcode 在 Post 里置 UNSUPPORTED。
+	// 必须排在 V_NOT 之后 (NOT 先匹配其专属编码)。
+	{
+		Name: "V_ASIMD_CVT", Mask: 0x9F3E0C00, Value: 0x0E200800, Op: V_VSCVTF,
+		Fields: []FieldDef{
+			{Name: "Q", Hi: 30, Lo: 30}, {Name: "U", Hi: 29, Lo: 29},
+			{Name: "size", Hi: 23, Lo: 22}, {Name: "opcode", Hi: 16, Lo: 12},
+			fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			U, size, opc := f["U"], f["size"], f["opcode"]
+			if f["Q"] != 0 {
+				inst.Imm = 16
+			} else {
+				inst.Imm = 8
+			}
+			if size&1 != 0 { // bit22: 0→S(4) 1→D(8)
+				inst.Shift = 8
+			} else {
+				inst.Shift = 4
+			}
+			switch {
+			case opc == 0b11101 && U == 0:
+				inst.Op = int(V_VSCVTF)
+			case opc == 0b11101 && U == 1:
+				inst.Op = int(V_VUCVTF)
+			case opc == 0b11011 && U == 0:
+				inst.Op = int(V_VFCVTZS)
+			case opc == 0b11011 && U == 1:
+				inst.Op = int(V_VFCVTZU)
+			default:
+				inst.Op = int(UNSUPPORTED)
+			}
+		},
+	},
 }
 
 // decodeImm5 解析 AdvSIMD copy 的 imm5: 最低置位决定元素大小, 其余位为索引。

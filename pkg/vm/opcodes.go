@@ -159,6 +159,9 @@ const (
 	// NEON 向量浮点融合乘加: [op][subop][d][n][m][esize][nbytes] = 7B
 	//   subop 0 FMLA(d+=n*m) 1 FMLS(d-=n*m); 逐 lane 单次舍入 fma
 	OpVecFma byte = 0x48
+	// NEON 向量整数↔浮点转换: [op][subop][d][n][esize][nbytes] = 6B
+	//   subop 0 SCVTF 1 UCVTF (int→fp) 2 FCVTZS 3 FCVTZU (fp→int, 向零截断/饱和)
+	OpVecCvt byte = 0x4A
 
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target

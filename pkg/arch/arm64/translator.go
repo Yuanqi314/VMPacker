@@ -732,6 +732,15 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		return 0, t.trVecFma(inst, 0)
 	case V_VFMLS:
 		return 0, t.trVecFma(inst, 1)
+	// NEON 向量整数↔浮点转换
+	case V_VSCVTF:
+		return 0, t.trVecCvt(inst, 0)
+	case V_VUCVTF:
+		return 0, t.trVecCvt(inst, 1)
+	case V_VFCVTZS:
+		return 0, t.trVecCvt(inst, 2)
+	case V_VFCVTZU:
+		return 0, t.trVecCvt(inst, 3)
 
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")
