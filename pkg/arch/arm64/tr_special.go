@@ -1,8 +1,6 @@
 package arm64
 
 import (
-	
-
 	"github.com/vmpacker/pkg/vm"
 )
 

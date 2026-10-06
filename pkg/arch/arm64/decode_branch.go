@@ -226,52 +226,10 @@ var branchPatterns = []InstrPattern{
 		Op:    XPACLRI,
 	},
 
-	// BTI (Branch Target Identification) 指令
-	// ---- BTI C - 接受 CALL 类型跳转 ----
+	// BTI (Branch Target Identification) — HINT 空间 CRm=0b0100, op2 区分
+	// BTI/c/j/jc 真实编码 0xD503241F/245F/249F/24DF (op2 为 bits[7:5])。
+	// 一条模式覆盖全部 4 种 (op2 可变); VM 不模拟 BTI 状态, 翻译为 NOP。
 	{
-		Name:   "BTI C",
-		Mask:   0xFFFFFFFF,
-		Value:  0xD503245F, // HINT #36
-		Op:     BTI_C,
-		Fields: []FieldDef{},
-		Post: func(f map[string]int64, inst *vm.Instruction) {
-			inst.Imm = 36 // hint number
-		},
-	},
-
-	// ---- BTI J - 接受 JUMP 类型跳转 ----
-	{
-		Name:   "BTI J",
-		Mask:   0xFFFFFFFF,
-		Value:  0xD503255F, // HINT #44
-		Op:     BTI_J,
-		Fields: []FieldDef{},
-		Post: func(f map[string]int64, inst *vm.Instruction) {
-			inst.Imm = 44
-		},
-	},
-
-	// ---- BTI JC - 接受两者 ----
-	{
-		Name:   "BTI JC",
-		Mask:   0xFFFFFFFF,
-		Value:  0xD503265F, // HINT #50
-		Op:     BTI_JC,
-		Fields: []FieldDef{},
-		Post: func(f map[string]int64, inst *vm.Instruction) {
-			inst.Imm = 50
-		},
-	},
-
-	// ---- BTI (默认 = BTI JC) ----
-	{
-		Name:   "BTI",
-		Mask:   0xFFFFFFFF,
-		Value:  0xD503275F, // HINT #62
-		Op:     BTI,
-		Fields: []FieldDef{},
-		Post: func(f map[string]int64, inst *vm.Instruction) {
-			inst.Imm = 62
-		},
+		Name: "BTI", Mask: 0xFFFFFF1F, Value: 0xD503241F, Op: BTI,
 	},
 }

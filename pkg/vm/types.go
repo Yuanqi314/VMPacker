@@ -15,18 +15,18 @@ const REG_XZR = -2
 
 // Instruction 通用指令表示（架构无关）
 type Instruction struct {
-	Raw    uint32
-	Op     int
-	Rd     int // 目标寄存器
-	Rn     int // 第一源寄存器
-	Rm     int // 第二源寄存器
-	Imm    int64
+	Raw       uint32
+	Op        int
+	Rd        int // 目标寄存器
+	Rn        int // 第一源寄存器
+	Rm        int // 第二源寄存器
+	Imm       int64
 	Shift     int
 	ShiftType int // 0=LSL, 1=LSR, 2=ASR, 3=ROR
 	Cond      int
-	SF     bool // 64-bit (true) vs 32-bit (false)
-	Offset int  // 指令在函数内的偏移
-	WB     int  // Writeback 模式 (0=无, 1=post, 3=pre)
+	SF        bool // 64-bit (true) vs 32-bit (false)
+	Offset    int  // 指令在函数内的偏移
+	WB        int  // Writeback 模式 (0=无, 1=post, 3=pre)
 }
 
 // Decoder 架构解码器接口

@@ -57,7 +57,8 @@ func extractFields(raw uint32, fields []FieldDef) map[string]int64 {
 // applyCommonFields 将常见字段名映射到 vm.Instruction
 //
 // 约定: Rd→inst.Rd, Rn→inst.Rn, Rm→inst.Rm, sf→inst.SF,
-//       cond→inst.Cond, wb→inst.WB, shift→inst.Shift
+//
+//	cond→inst.Cond, wb→inst.WB, shift→inst.Shift
 //
 // inst.Imm 由各指令的 Post 回调设置（因为 imm 宽度/缩放各不相同）
 func applyCommonFields(fields map[string]int64, inst *vm.Instruction) {

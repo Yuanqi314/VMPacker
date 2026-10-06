@@ -1,8 +1,6 @@
 package arm64
 
 import (
-	"fmt"
-
 	"github.com/vmpacker/pkg/vm"
 )
 
@@ -62,5 +60,32 @@ func (t *Translator) trSBFM(inst vm.Instruction) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("复杂 SBFM (immr=%d, imms=%d) 暂不支持", immr, imms)
+	// 通用 SBFM: SBFX (imms>=immr) / SBFIZ (imms<immr)。
+	// 统一用 "左移顶对齐 + 算术右移做符号扩展" 在 64 位里实现, 32 位结尾 trunc32。
+	if imms >= immr {
+		// SBFX: 取 bits[imms:immr] 符号扩展到 bit0
+		l := 63 - imms
+		r := l + immr
+		t.emit(vm.OpShlImm, rd, rn)
+		t.emitU32(l)
+		t.emit(vm.OpAsrImm, rd, rd)
+		t.emitU32(r)
+	} else {
+		// SBFIZ: 取 bits[imms:0] (width=imms+1) 符号扩展, 左移 lsb 放到高位
+		width := imms + 1
+		lsb := uint32(64) - immr
+		if !inst.SF {
+			lsb = 32 - immr
+		}
+		t.emit(vm.OpShlImm, rd, rn)
+		t.emitU32(64 - width)
+		t.emit(vm.OpAsrImm, rd, rd)
+		t.emitU32(64 - width)
+		t.emit(vm.OpShlImm, rd, rd)
+		t.emitU32(lsb)
+	}
+	if !inst.SF {
+		t.trunc32(rd)
+	}
+	return nil
 }

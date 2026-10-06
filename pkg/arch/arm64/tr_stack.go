@@ -394,6 +394,14 @@ func (t *Translator) trStackLoad(inst vm.Instruction) error {
 		t.sPushImm32(48)
 		t.emit(vm.OpSAsr)
 	}
+	// LDRSB/LDRSH 的 w 变体 (32-bit 目标): 写 W 寄存器会清零高 32 位,
+	// 故在 64 位符号扩展后再逻辑截断到 32 位 (<<32 再逻辑 >>32)。
+	if !inst.SF && (op == LDRSB_IMM || op == LDRSH_IMM) {
+		t.sPushImm32(32)
+		t.emit(vm.OpSShl)
+		t.sPushImm32(32)
+		t.emit(vm.OpSShr)
+	}
 
 	if inst.Rd == vm.REG_XZR {
 		t.sDrop()
@@ -420,6 +428,13 @@ signext:
 			t.emit(vm.OpSShl)
 			t.sPushImm32(48)
 			t.emit(vm.OpSAsr)
+		}
+		// w 变体 (32-bit 目标) 清零高 32 位
+		if !inst.SF && (op == LDRSB_IMM || op == LDRSH_IMM) {
+			t.sPushImm32(32)
+			t.emit(vm.OpSShl)
+			t.sPushImm32(32)
+			t.emit(vm.OpSShr)
 		}
 		t.sVstore(rd)
 	}

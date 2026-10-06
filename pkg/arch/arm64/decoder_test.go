@@ -381,6 +381,68 @@ func TestDecode_STUR_32(t *testing.T) {
 	expect(t, "STUR_32 Imm", int64(-4), inst.Imm)
 }
 
+// 有符号子字加载的 w/x 变体: w 变体 (opc=11) SF=false (写 W 寄存器清零高 32 位),
+// x 变体 (opc=10) SF=true。
+func TestDecode_LDRS_WvsX(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw uint32
+		op  Op
+		sf  bool
+		imm int64
+	}{
+		{0x79C00820, LDRSH_IMM, false, 4}, // ldrsh w0,[x1,#4]
+		{0x79800820, LDRSH_IMM, true, 4},  // ldrsh x0,[x1,#4]
+		{0x39C01020, LDRSB_IMM, false, 4}, // ldrsb w0,[x1,#4]
+		{0x39801020, LDRSB_IMM, true, 4},  // ldrsb x0,[x1,#4]
+	}
+	for _, c := range cases {
+		in := d.Decode(c.raw, 0)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "SF", c.sf, in.SF)
+		expect(t, "Imm", c.imm, in.Imm)
+	}
+	// 后变址有符号加载 (opc=10) 应标记为 64 位 (SF=true), 以免被 32 位截断逻辑误伤
+	ppx := d.Decode(0x78801420, 0) // ldrsh x0,[x1],#1 (opc=10, post)
+	expect(t, "ldrsh x post Op", int(LDRSH_IMM), ppx.Op)
+	expect(t, "ldrsh x post SF", true, ppx.SF)
+	ppb := d.Decode(0x38801420, 0) // ldrsb x0,[x1],#1 (opc=10, post)
+	expect(t, "ldrsb x post Op", int(LDRSB_IMM), ppb.Op)
+	expect(t, "ldrsb x post SF", true, ppb.SF)
+}
+
+// SBFM 通用情形: SBFX / SBFIZ 不再落入 UNSUPPORTED, 可成功翻译。
+func TestTranslate_SBFM_General(t *testing.T) {
+	d := NewDecoder()
+	insts := []vm.Instruction{
+		d.Decode(0x13042C20, 0),  // sbfx w0,w1,#4,#8
+		d.Decode(0x93442C20, 4),  // sbfx x0,x1,#4,#8
+		d.Decode(0x131C1C20, 8),  // sbfiz w0,w1,#4,#8
+		d.Decode(0x937C1C20, 12), // sbfiz x0,x1,#4,#8
+	}
+	for i, in := range insts {
+		if Op(in.Op) != SBFM {
+			t.Fatalf("inst %d: want SBFM, got Op=%d", i, in.Op)
+		}
+	}
+	tr := NewTranslator(0x400000, 0x20)
+	res, err := tr.Translate(insts)
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	expect(t, "all translated", 4, res.TransInsts)
+}
+
+// BTI 的 4 个变体 (c/j/jc/裸) 均解码为 BTI (翻译为 NOP)。
+func TestDecode_BTI_Variants(t *testing.T) {
+	d := NewDecoder()
+	for _, raw := range []uint32{0xD503241F, 0xD503245F, 0xD503249F, 0xD50324DF} {
+		in := d.Decode(raw, 0)
+		expect(t, "BTI Op", int(BTI), in.Op)
+	}
+}
+
 // ---- 辅助 ----
 
 func expect[T comparable](t *testing.T, name string, want, got T) {

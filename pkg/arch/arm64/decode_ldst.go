@@ -263,17 +263,17 @@ var ldstPatterns = []InstrPattern{
 		Fields: []FieldDef{{Name: "imm9", Hi: 20, Lo: 12, Signed: true}, {Name: "wb", Hi: 11, Lo: 10}, fRn, fRd},
 		Post:   postLdrStrPrePostXZR,
 	},
-	// LDRSB pre/post: size=00,V=0,opc=10,wb → 0x38800400
+	// LDRSB pre/post: size=00,V=0,opc=10,wb → 0x38800400 (opc=10 → 64-bit 目标, SF=true)
 	{
 		Name: "LDRSB_IMM_PP", Mask: 0xFFE00400, Value: 0x38800400, Op: LDRSB_IMM,
 		Fields: []FieldDef{{Name: "imm9", Hi: 20, Lo: 12, Signed: true}, {Name: "wb", Hi: 11, Lo: 10}, fRn, fRd},
-		Post:   postLdrStrPrePostXZR,
+		Post:   postLdrStrPrePost(true),
 	},
-	// LDRSH pre/post: size=01,V=0,opc=10,wb → 0x78800400
+	// LDRSH pre/post: size=01,V=0,opc=10,wb → 0x78800400 (opc=10 → 64-bit 目标, SF=true)
 	{
 		Name: "LDRSH_IMM_PP", Mask: 0xFFE00400, Value: 0x78800400, Op: LDRSH_IMM,
 		Fields: []FieldDef{{Name: "imm9", Hi: 20, Lo: 12, Signed: true}, {Name: "wb", Hi: 11, Lo: 10}, fRn, fRd},
-		Post:   postLdrStrPrePostXZR,
+		Post:   postLdrStrPrePost(true),
 	},
 	// LDRSW pre/post: size=10,V=0,opc=10,wb → 0xB8800400
 	{
@@ -352,11 +352,17 @@ var ldstPatterns = []InstrPattern{
 		Fields: []FieldDef{{Name: "imm12", Hi: 21, Lo: 10}, fRn, fRd},
 		Post:   postUnsigned(1, false),
 	},
-	// LDRSH unsigned (size=01, opc=10)
+	// LDRSH unsigned (size=01, opc=10) → 64-bit dest
 	{
 		Name: "LDRSH_UIMM", Mask: 0xFFC00000, Value: 0x79800000, Op: LDRSH_IMM,
 		Fields: []FieldDef{{Name: "imm12", Hi: 21, Lo: 10}, fRn, fRd},
 		Post:   postUnsigned(2, true),
+	},
+	// LDRSH unsigned (size=01, opc=11) → 32-bit dest (ldrsh w)
+	{
+		Name: "LDRSH_UIMM32", Mask: 0xFFC00000, Value: 0x79C00000, Op: LDRSH_IMM,
+		Fields: []FieldDef{{Name: "imm12", Hi: 21, Lo: 10}, fRn, fRd},
+		Post:   postUnsigned(2, false),
 	},
 
 	// ================================================================
