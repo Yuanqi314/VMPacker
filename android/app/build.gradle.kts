@@ -2,14 +2,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application) // AGP 9 applies Kotlin itself (built-in Kotlin)
+    alias(libs.plugins.compose.compiler)    // Compose compiler, same version as Kotlin (2.4.20)
     alias(libs.plugins.jetbrains.compose)   // JetBrains Compose runtime/DSL (matches miuix)
 }
-
-// The Compose compiler plugin is provided by the Kotlin Gradle Plugin forced on
-// the build classpath in the root build.gradle.kts (2.4.20). Apply it from the
-// classpath via legacy apply(); the plugins{} block would need a pluginManagement
-// version, which we deliberately avoid so the compiler always matches that KGP.
-apply(plugin = "org.jetbrains.kotlin.plugin.compose")
 
 android {
     namespace = "com.vmpacker.app"
