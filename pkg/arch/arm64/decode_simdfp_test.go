@@ -357,6 +357,41 @@ func TestDecode_SIMDFP_VCvt(t *testing.T) {
 	expect(t, "all translated", len(cases), res.TransInsts)
 }
 
+// 标量整数↔浮点转换解码 (scalar SCVTF/UCVTF/FCVTZS/FCVTZU)。
+// 头两条取自真实崩溃报告 (UE4 ImGui VulkanView nativeStep @ 0xE4964)。
+func TestDecode_SIMDFP_ScalarCvt(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw uint32
+		op  Op
+		es  int
+		nb  int64
+	}{
+		{0x5E21D800, V_VSCVTF, 4, 4},  // scvtf s0, s0
+		{0x5E21D821, V_VSCVTF, 4, 4},  // scvtf s1, s1
+		{0x7E21D820, V_VUCVTF, 4, 4},  // ucvtf s0, s1
+		{0x5EA1B820, V_VFCVTZS, 4, 4}, // fcvtzs s0, s1
+		{0x7EA1B820, V_VFCVTZU, 4, 4}, // fcvtzu s0, s1
+		{0x5E61D820, V_VSCVTF, 8, 8},  // scvtf d0, d1
+		{0x5EE1B820, V_VFCVTZS, 8, 8}, // fcvtzs d0, d1
+	}
+	insts := make([]vm.Instruction, len(cases))
+	for i, c := range cases {
+		in := d.Decode(c.raw, i*4)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "es", c.es, in.Shift)
+		expect(t, "nbytes", c.nb, in.Imm)
+		insts[i] = in
+	}
+	tr := NewTranslator(0x400000, 0x20)
+	res, err := tr.Translate(insts)
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	expect(t, "all translated", len(cases), res.TransInsts)
+}
+
 // NEON 置换/反转/提取解码 (ZIP/UZP/TRN/REV/EXT)。
 func TestDecode_SIMDFP_Perm(t *testing.T) {
 	d := NewDecoder()

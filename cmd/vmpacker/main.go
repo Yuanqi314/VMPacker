@@ -32,7 +32,7 @@ func main() {
 	verbose := flag.Bool("v", false, "详细输出（显示反汇编）")
 	strip := flag.Bool("strip", true, "清除符号表（防止strip破坏保护）")
 	debug := flag.Bool("debug", false, "生成 debug 对照文件（ARM64 → VM 字节码映射）")
-	tokenEntry := flag.Bool("token", true, "启用 Token 化入口模式（3 指令跳板）— 默认开启")
+	tokenEntry := flag.Bool("token", true, "内联 3 指令 Token 跳板（12B）；关闭则用紧凑单跳转（站点仅 4B，thunk 置于 payload）。小于 12B 的函数始终自动走紧凑模式")
 	info := flag.Bool("info", false, "仅打印 ELF 信息，不做保护")
 
 	flag.Usage = func() {

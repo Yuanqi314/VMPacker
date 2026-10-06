@@ -2,16 +2,20 @@ package com.vmpacker.app
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +28,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -34,9 +44,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -66,6 +78,7 @@ private fun PackerScreen() {
     var format by remember { mutableStateOf("") }
     val functions = remember { mutableStateListOf<FuncInfo>() }
     val selected = remember { mutableStateListOf<String>() }
+    var query by remember { mutableStateOf("") }
 
     var strip by remember { mutableStateOf(true) }
     var token by remember { mutableStateOf(true) }
@@ -84,7 +97,7 @@ private fun PackerScreen() {
         scope.launch {
             busy = true
             status = "正在分析 $name ..."
-            functions.clear(); selected.clear(); arch = ""; format = ""
+            functions.clear(); selected.clear(); query = ""; arch = ""; format = ""
             try {
                 val (file, json) = withContext(Dispatchers.IO) {
                     val f = copyUriToCache(context, uri, "input.bin")
@@ -137,104 +150,164 @@ private fun PackerScreen() {
         }
     }
 
+    // Functions matching the current search query.
+    val shown = if (query.isBlank()) {
+        functions
+    } else {
+        functions.filter { it.name.contains(query, ignoreCase = true) }
+    }
+    val allShownSelected = shown.isNotEmpty() && shown.all { selected.contains(it.name) }
+    val canProtect = !busy && selected.isNotEmpty()
+
     Scaffold(
         topBar = { TopAppBar(title = "VMPacker") }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Status / file summary.
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = status, color = MiuixTheme.colorScheme.onSurface)
-                    if (arch.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "$format · $arch · $inputName",
-                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        )
-                    }
-                }
-            }
-
-            Button(
-                onClick = { openInput.launch(arrayOf("*/*")) },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp, bottom = if (functions.isNotEmpty()) 104.dp else 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(if (inputFile == null) "选择 ELF 文件" else "重新选择文件")
-            }
-
-            if (inputFile != null) {
-                Text(text = "选项", color = MiuixTheme.colorScheme.onSurface)
-                ToggleRow("清除符号表 (strip)", strip) { strip = it }
-                ToggleRow("Token 化入口 (3 指令跳板)", token) { token = it }
-                ToggleRow("生成 debug 对照", debug) { debug = it }
-            }
-
-            if (functions.isNotEmpty()) {
-                Text(
-                    text = "选择要保护的函数 (${selected.size}/${functions.size})",
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
-                functions.forEach { fn ->
-                    val isSel = selected.contains(fn.name)
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (isSel) selected.remove(fn.name) else selected.add(fn.name)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = fn.name, color = MiuixTheme.colorScheme.onSurface)
-                                Text(
-                                    text = "${fn.address} · ${fn.size} B",
-                                    color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                )
-                            }
-                            if (isSel) {
-                                Text(text = "✓", color = MiuixTheme.colorScheme.primary)
-                            }
+                // Status / file summary.
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(text = status, color = MiuixTheme.colorScheme.onSurface)
+                        if (arch.isNotEmpty()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "$format · $arch · $inputName",
+                                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            )
                         }
                     }
                 }
 
                 Button(
-                    onClick = { createOutput.launch("$inputName.vmp") },
-                    enabled = !busy && selected.isNotEmpty(),
+                    onClick = { openInput.launch(arrayOf("*/*")) },
+                    enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (busy) "处理中 ..." else "开始保护 (${selected.size})")
+                    Text(if (inputFile == null) "选择 ELF 文件" else "重新选择文件")
                 }
-            }
 
-            if (logger.lines.isNotEmpty()) {
-                Text(text = "引擎日志", color = MiuixTheme.colorScheme.onSurface)
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        val style = TextStyle(
-                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
+                if (inputFile != null) {
+                    Text(text = "选项", color = MiuixTheme.colorScheme.onSurface)
+                    ToggleRow("清除符号表 (strip)", strip) { strip = it }
+                    ToggleRow("Token 化入口 (3 指令跳板)", token) { token = it }
+                    ToggleRow("生成 debug 对照", debug) { debug = it }
+                }
+
+                if (functions.isNotEmpty()) {
+                    // Header with live count + a Select All / Deselect All action.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "选择要保护的函数 (${selected.size}/${functions.size})",
+                            color = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
                         )
-                        logger.lines.takeLast(200).forEach { line ->
-                            BasicText(text = line, style = style)
+                        Text(
+                            text = if (allShownSelected) "取消全选" else "全选",
+                            color = MiuixTheme.colorScheme.primary,
+                            modifier = Modifier.clickable {
+                                if (allShownSelected) {
+                                    shown.forEach { selected.remove(it.name) }
+                                } else {
+                                    shown.forEach { if (!selected.contains(it.name)) selected.add(it.name) }
+                                }
+                            },
+                        )
+                    }
+
+                    // Search box.
+                    TextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "搜索函数名",
+                        singleLine = true,
+                    )
+
+                    if (shown.isEmpty()) {
+                        Text(
+                            text = "没有匹配 \"$query\" 的函数",
+                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        )
+                    }
+
+                    shown.forEach { fn ->
+                        val isSel = selected.contains(fn.name)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            showIndication = true,
+                            onClick = {
+                                if (isSel) selected.remove(fn.name) else selected.add(fn.name)
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = fn.name, color = MiuixTheme.colorScheme.onSurface)
+                                    Text(
+                                        text = "${fn.address} · ${fn.size} B",
+                                        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    )
+                                }
+                                CircleCheck(selected = isSel)
+                            }
+                        }
+                    }
+                }
+
+                if (logger.lines.isNotEmpty()) {
+                    Text(text = "引擎日志", color = MiuixTheme.colorScheme.onSurface)
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            val style = TextStyle(
+                                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                            )
+                            logger.lines.takeLast(200).forEach { line ->
+                                BasicText(text = line, style = style)
+                            }
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            // "Start Protection" stays anchored in the lower part of the screen
+            // (with a margin above the navigation bar), not flush to the very bottom.
+            if (functions.isNotEmpty()) {
+                Button(
+                    onClick = { createOutput.launch("$inputName.vmp") },
+                    enabled = canProtect,
+                    // Blue (primary) once a function is selected, MIUIX-style; neutral otherwise.
+                    colors = if (canProtect) {
+                        ButtonDefaults.buttonColorsPrimary()
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 24.dp),
+                ) {
+                    Text(if (busy) "处理中 ..." else "开始保护 (${selected.size})")
+                }
+            }
         }
     }
 }
@@ -242,9 +315,9 @@ private fun PackerScreen() {
 @Composable
 private fun ToggleRow(label: String, value: Boolean, onToggle: (Boolean) -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onToggle(!value) }
+        modifier = Modifier.fillMaxWidth(),
+        showIndication = true,
+        onClick = { onToggle(!value) },
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -259,6 +332,43 @@ private fun ToggleRow(label: String, value: Boolean, onToggle: (Boolean) -> Unit
                 text = if (value) "开" else "关",
                 color = if (value) MiuixTheme.colorScheme.primary
                 else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            )
+        }
+    }
+}
+
+/** Circular selection indicator: a filled blue circle with a white check when selected,
+ *  an empty outlined circle otherwise — matching the MIUIX reference. */
+@Composable
+private fun CircleCheck(selected: Boolean) {
+    val primary = MiuixTheme.colorScheme.primary
+    val outline = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+    Canvas(modifier = Modifier.size(22.dp)) {
+        val d = size.minDimension
+        val r = d / 2f
+        val center = Offset(size.width / 2f, size.height / 2f)
+        if (selected) {
+            drawCircle(color = primary, radius = r, center = center)
+            val check = Path().apply {
+                moveTo(d * 0.28f, d * 0.52f)
+                lineTo(d * 0.43f, d * 0.67f)
+                lineTo(d * 0.73f, d * 0.34f)
+            }
+            drawPath(
+                path = check,
+                color = Color.White,
+                style = Stroke(
+                    width = d * 0.11f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round,
+                ),
+            )
+        } else {
+            drawCircle(
+                color = outline,
+                radius = r - d * 0.06f,
+                center = center,
+                style = Stroke(width = d * 0.08f),
             )
         }
     }

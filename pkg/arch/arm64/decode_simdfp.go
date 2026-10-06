@@ -616,6 +616,41 @@ var simdfpPatterns = []InstrPattern{
 			}
 		},
 	},
+
+	// ---- ASIMD 标量 2-reg misc: 标量整数↔浮点转换 ----
+	// 01 U 11110 size 10000 opcode 10 Rn Rd  (标量形式, bit28=1)
+	//   SCVTF/UCVTF (11101), FCVTZS/FCVTZU (11011)。与向量 2-misc 同 opcode,
+	//   但只处理单个 lane (S 或 D), 写回时高位零扩展 —— 正是标量 FP 写回语义,
+	//   因此复用 V_VSCVTF 等 (OpVecCvt), 仅令 nbytes=esize。
+	//   size<1>=1 (10/11) 属 FP16/FRECPE 等, 非转换 → UNSUPPORTED。
+	{
+		Name: "V_SCALAR_2MISC", Mask: 0xDF3E0C00, Value: 0x5E200800, Op: V_VSCVTF,
+		Fields: []FieldDef{
+			{Name: "U", Hi: 29, Lo: 29},
+			{Name: "size", Hi: 23, Lo: 22},
+			{Name: "opcode", Hi: 16, Lo: 12},
+			fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			U, size, opc := f["U"], f["size"], f["opcode"]
+			es := cvtEs(size) // 元素字节由 size<0> (sz) 决定: 0→S/4, 1→D/8
+			inst.Shift, inst.Imm = es, int64(es)
+			// size<1> 区分方向: int→fp (SCVTF/UCVTF) 用 0x, fp→int (FCVTZS/U)
+			// 用 1x; 据此排除同 opcode 的 FRECPE/FRSQRTE 等非转换指令。
+			switch {
+			case opc == 0b11101 && size < 0b10 && U == 0:
+				inst.Op = int(V_VSCVTF)
+			case opc == 0b11101 && size < 0b10 && U == 1:
+				inst.Op = int(V_VUCVTF)
+			case opc == 0b11011 && size >= 0b10 && U == 0:
+				inst.Op = int(V_VFCVTZS)
+			case opc == 0b11011 && size >= 0b10 && U == 1:
+				inst.Op = int(V_VFCVTZU)
+			default:
+				inst.Op = int(UNSUPPORTED)
+			}
+		},
+	},
 }
 
 // cvtEs: 2-reg-misc 转换指令的 size(bit22) → 元素字节 (0→S/4, 1→D/8)

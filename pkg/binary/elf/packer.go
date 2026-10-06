@@ -870,6 +870,26 @@ func (p *Packer) injectVMPBatch(funcs []FuncBytecode) error {
 			payload = append(payload, desc[:]...)
 		}
 
+		// 5a-2. 为需要「紧凑跳板」的函数预留 thunk 槽。
+		// tokenEntry=false（UI 关闭 3 指令跳板）时全部走紧凑模式；
+		// 另外, 函数小于内联跳板(12B)时自动回退到紧凑模式, 使 4~11B 的小函数也能保护。
+		// 每个 thunk 为 3 指令 Token 跳板(12B), 4 字节对齐, 位于可执行 payload 段内。
+		for len(payload)%4 != 0 {
+			payload = append(payload, 0x00)
+		}
+		useBranch := make([]bool, len(funcs))
+		thunkVA := make([]uint64, len(funcs))
+		thunkFileOff := make([]uint64, len(funcs))
+		for i, fb := range funcs {
+			useBranch[i] = !p.tokenEntry || fb.FI.Size < uint64(TokenTrampolineSize)
+			if useBranch[i] {
+				thunkOff := len(payload)
+				thunkVA[i] = payloadVA + uint64(thunkOff)
+				thunkFileOff[i] = payloadFileOff + uint64(thunkOff)
+				payload = append(payload, make([]byte, TokenTrampolineSize)...)
+			}
+		}
+
 		// 更新 PT_LOAD 段大小 (payload 增长了)
 		newPhdr.Filesz = uint64(len(payload))
 		newPhdr.Memsz = uint64(len(payload))
@@ -895,6 +915,36 @@ func (p *Packer) injectVMPBatch(funcs []FuncBytecode) error {
 			funcID := uint32(i) // func_id = 序号 (0-based)
 			token := (uint32(fb.XorKey) << 24) | (0 << 12) | (funcID & 0xFFF)
 
+			if useBranch[i] {
+				// ---- 紧凑模式: 站点写 4 字节 B → payload 内的 thunk ----
+				// thunk 自身执行 3 指令 Token 跳板, 与内联版等价。
+				if fb.FI.Size < uint64(BranchTrampolineSize) {
+					return fmt.Errorf("function %s too small for any trampoline (%d bytes, need >= %d)",
+						fb.FI.Name, fb.FI.Size, BranchTrampolineSize)
+				}
+				thunk := BuildTokenTrampoline(thunkVA[i], vmEntryTokenVA, token)
+				copy(p.data[thunkFileOff[i]:], thunk)
+
+				branch, err := BuildBranchTrampoline(fb.FI.Addr, thunkVA[i])
+				if err != nil {
+					return fmt.Errorf("branch trampoline for %s: %w", fb.FI.Name, err)
+				}
+				copy(p.data[fb.FI.Offset:], branch)
+
+				// 销毁站点剩余原始代码 (4B 函数时无剩余)
+				garbageLen := int(fb.FI.Size) - len(branch)
+				if garbageLen > 0 {
+					garbage := make([]byte, garbageLen)
+					rand.Read(garbage)
+					copy(p.data[fb.FI.Offset+uint64(len(branch)):], garbage)
+				}
+
+				fmt.Printf("    [TOKEN] %s: func_id=%d, token=0x%08X, branch(%dB)->thunk@0x%X\n",
+					fb.FI.Name, funcID, token, len(branch), thunkVA[i])
+				continue
+			}
+
+			// ---- 内联模式: 站点直接写 12 字节 3 指令 Token 跳板 ----
 			trampoline := BuildTokenTrampoline(fb.FI.Addr, vmEntryTokenVA, token)
 			if uint64(len(trampoline)) > fb.FI.Size {
 				return fmt.Errorf("token trampoline for %s (%d bytes) exceeds function size (%d bytes)",
@@ -914,7 +964,7 @@ func (p *Packer) injectVMPBatch(funcs []FuncBytecode) error {
 				copy(p.data[fb.FI.Offset+uint64(len(trampoline)):], garbage)
 			}
 
-			fmt.Printf("    [TOKEN] %s: func_id=%d, token=0x%08X, trampoline=%d bytes\n",
+			fmt.Printf("    [TOKEN] %s: func_id=%d, token=0x%08X, trampoline=%d bytes (inline)\n",
 				fb.FI.Name, funcID, token, len(trampoline))
 		}
 	}
