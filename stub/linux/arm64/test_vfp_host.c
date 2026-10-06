@@ -6,6 +6,7 @@
  *
  *   gcc -I stub/linux/arm64 -lm -o /tmp/tvfp stub/linux/arm64/test_vfp_host.c && /tmp/tvfp
  */
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -222,6 +223,68 @@ int main(void) {
     vm.pc = 0;
     h_vfcsel(&vm);
     CHECK(vf_getd(&vm, 0) == 22.0, "fcsel NE false → m");
+  }
+
+  /* ---- FMADD/FMSUB/FNMADD/FNMSUB (double) ---- */
+  {
+    vf_setd(&vm, 1, 3.0); /* n */
+    vf_setd(&vm, 2, 4.0); /* m */
+    vf_setd(&vm, 3, 5.0); /* a */
+    /* madd: a+n*m=17  msub: a-n*m=-7  nmadd: -a-n*m=-17  nmsub: -a+n*m=7 */
+    u8 subs[4] = {0, 1, 2, 3};
+    double exp[4] = {17.0, -7.0, -17.0, 7.0};
+    const char *nm[4] = {"fmadd d", "fmsub d", "fnmadd d", "fnmsub d"};
+    for (int k = 0; k < 4; k++) {
+      bc[0] = OP_VF_MADD;
+      bc[1] = subs[k];
+      bc[2] = 0;
+      bc[3] = 1;
+      bc[4] = 2;
+      bc[5] = 3;
+      bc[6] = 8;
+      vm.pc = 0;
+      u32 sz = h_vfmadd(&vm);
+      if (k == 0)
+        CHECK(sz == 7, "vfmadd returns size 7");
+      CHECK(vf_getd(&vm, 0) == exp[k], nm[k]);
+    }
+  }
+  /* ---- FMADD (float, 单精度路径) ---- */
+  {
+    vf_setf(&vm, 1, 2.0f);
+    vf_setf(&vm, 2, 3.0f);
+    vf_setf(&vm, 3, 1.0f);
+    bc[0] = OP_VF_MADD;
+    bc[1] = 0; /* madd: 1 + 2*3 = 7 */
+    bc[2] = 0;
+    bc[3] = 1;
+    bc[4] = 2;
+    bc[5] = 3;
+    bc[6] = 4;
+    vm.pc = 0;
+    h_vfmadd(&vm);
+    CHECK(vf_getf(&vm, 0) == 7.0f, "fmadd s");
+  }
+  /* ---- FMADD 融合性: 单次舍入 (fma) 与朴素 (n*m)+a 不同 ---- */
+  {
+    double n = 1.0 + ldexp(1.0, -27), m = n, a = -(1.0 + ldexp(1.0, -26));
+    vf_setd(&vm, 1, n);
+    vf_setd(&vm, 2, m);
+    vf_setd(&vm, 3, a);
+    bc[0] = OP_VF_MADD;
+    bc[1] = 0; /* madd */
+    bc[2] = 0;
+    bc[3] = 1;
+    bc[4] = 2;
+    bc[5] = 3;
+    bc[6] = 8;
+    vm.pc = 0;
+    h_vfmadd(&vm);
+    double got = vf_getd(&vm, 0);
+    volatile double prod = n * m; /* 阻止编译器收缩成 fma */
+    double naive = prod + a;
+    CHECK(got == __builtin_fma(n, m, a), "fmadd 结果等于 IEEE fma");
+    CHECK(naive == 0.0 && got != 0.0, "fmadd 为融合乘加 (非朴素 mul+add)");
   }
 
   printf("\n%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);

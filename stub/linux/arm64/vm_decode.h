@@ -175,6 +175,7 @@ static inline u8 vm_insn_size(u8 op) {
     return 4;
   case OP_VEC_BIN:
   case OP_VEC_FBIN:
+  case OP_VF_MADD:
     return 7;
   default:
     return 0;

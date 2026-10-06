@@ -85,6 +85,26 @@ static inline float vf_sqrtf(float a) {
 #endif
 }
 
+/* fma: 融合乘加 (单次舍入) x*y+z。arm64 用 fmadd 指令, 宿主机用 __builtin_fma */
+static inline double vf_fma_d(double x, double y, double z) {
+#if defined(__aarch64__)
+  double r;
+  __asm__("fmadd %d0, %d1, %d2, %d3" : "=w"(r) : "w"(x), "w"(y), "w"(z));
+  return r;
+#else
+  return __builtin_fma(x, y, z);
+#endif
+}
+static inline float vf_fma_f(float x, float y, float z) {
+#if defined(__aarch64__)
+  float r;
+  __asm__("fmadd %s0, %s1, %s2, %s3" : "=w"(r) : "w"(x), "w"(y), "w"(z));
+  return r;
+#else
+  return __builtin_fmaf(x, y, z);
+#endif
+}
+
 /* ---- FP 二元: [op][subop][d][n][m][w] ---- */
 static inline u32 h_vfbin(vm_ctx_t *vm) {
   u8 sub = vm->bc[vm->pc + 1], d = vm->bc[vm->pc + 2];
@@ -109,6 +129,28 @@ static inline u32 h_vfbin(vm_ctx_t *vm) {
     vf_setf(vm, d, r);
   }
   return 6;
+}
+
+/* ---- FP 融合乘加: [op][subop][d][n][m][a][w] ----
+ * subop: 0 madd(a+n*m) 1 msub(a-n*m) 2 nmadd(-a-n*m) 3 nmsub(-a+n*m)
+ * 统一归约为 fma(单次舍入): madd=fma(n,m,a) msub=fma(-n,m,a)
+ *                          nmadd=fma(-n,m,-a) nmsub=fma(n,m,-a) */
+static inline u32 h_vfmadd(vm_ctx_t *vm) {
+  u8 sub = vm->bc[vm->pc + 1], d = vm->bc[vm->pc + 2];
+  u8 n = vm->bc[vm->pc + 3], m = vm->bc[vm->pc + 4];
+  u8 a = vm->bc[vm->pc + 5], w = vm->bc[vm->pc + 6];
+  if (w == 8) {
+    double vn = vf_getd(vm, n), vmm = vf_getd(vm, m), va = vf_getd(vm, a);
+    double nn = (sub == 1 || sub == 2) ? -vn : vn;
+    double aa = (sub == 2 || sub == 3) ? -va : va;
+    vf_setd(vm, d, vf_fma_d(nn, vmm, aa));
+  } else {
+    float vn = vf_getf(vm, n), vmm = vf_getf(vm, m), va = vf_getf(vm, a);
+    float nn = (sub == 1 || sub == 2) ? -vn : vn;
+    float aa = (sub == 2 || sub == 3) ? -va : va;
+    vf_setf(vm, d, vf_fma_f(nn, vmm, aa));
+  }
+  return 7;
 }
 
 /* ---- FP 一元: [op][subop][d][n][w]  (0 abs, 1 neg, 2 sqrt) ----

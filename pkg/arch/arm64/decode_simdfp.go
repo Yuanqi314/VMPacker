@@ -337,6 +337,36 @@ var simdfpPatterns = []InstrPattern{
 		},
 	},
 
+	// ---- FP 融合乘加 (3-source): 0001 1111 0 ftype o1 Rm o0 Ra Rn Rd ----
+	// (o1,o0): (0,0) FMADD  (0,1) FMSUB  (1,0) FNMADD  (1,1) FNMSUB
+	{
+		Name: "V_FP_3SRC", Mask: 0xFF000000, Value: 0x1F000000, Op: V_FMADD,
+		Fields: []FieldDef{
+			{Name: "ftype", Hi: 23, Lo: 22},
+			{Name: "o1", Hi: 21, Lo: 21}, fRm16,
+			{Name: "o0", Hi: 15, Lo: 15}, {Name: "ra", Hi: 14, Lo: 10}, fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			w := fpTypeWidth(f["ftype"])
+			if w == 0 {
+				inst.Op = int(UNSUPPORTED)
+				return
+			}
+			inst.Shift = w
+			inst.Imm = f["ra"] // 累加寄存器 Ra
+			switch (f["o1"] << 1) | f["o0"] {
+			case 0b00:
+				inst.Op = int(V_FMADD)
+			case 0b01:
+				inst.Op = int(V_FMSUB)
+			case 0b10:
+				inst.Op = int(V_FNMADD)
+			case 0b11:
+				inst.Op = int(V_FNMSUB)
+			}
+		},
+	},
+
 	// ---- ASIMD 3-same: 0 Q U 01110 size 1 Rm opcode 1 Rn Rd ----
 	// 覆盖整数 ADD/SUB/MUL、逻辑 AND/BIC/ORR/ORN/EOR、浮点 FADD/FSUB/FMUL/FDIV
 	{

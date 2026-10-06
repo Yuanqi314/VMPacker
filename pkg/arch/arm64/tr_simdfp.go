@@ -152,6 +152,30 @@ func (t *Translator) trVFBin(inst vm.Instruction, subop byte) error {
 	return nil
 }
 
+// trVFMAdd 翻译 FP 融合乘加 (FMADD/FMSUB/FNMADD/FNMSUB)。
+// subop: 0 madd(a+n*m) 1 msub(a-n*m) 2 nmadd(-a-n*m) 3 nmsub(-a+n*m)。
+// 累加寄存器 Ra 存放在 inst.Imm。
+func (t *Translator) trVFMAdd(inst vm.Instruction, subop byte) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	m, err := t.vreg(inst.Rm)
+	if err != nil {
+		return err
+	}
+	a, err := t.vreg(int(inst.Imm))
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVFMAdd, subop, d, n, m, a, byte(inst.Shift))
+	return nil
+}
+
 // trVFUn 翻译 FP 一元运算 (FABS/FNEG/FSQRT)。subop: 0 abs 1 neg 2 sqrt。
 func (t *Translator) trVFUn(inst vm.Instruction, subop byte) error {
 	d, err := t.vreg(inst.Rd)

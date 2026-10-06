@@ -152,6 +152,34 @@ func TestDecode_SIMDFP_FPArith(t *testing.T) {
 	}
 }
 
+// FP 融合乘加解码 (FMADD/FMSUB/FNMADD/FNMSUB)。Ra 存于 inst.Imm。
+func TestDecode_SIMDFP_FMADD(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw uint32
+		op  Op
+		w   int
+	}{
+		{0x1F420C20, V_FMADD, 8},  // fmadd d0,d1,d2,d3
+		{0x1F428C20, V_FMSUB, 8},  // fmsub d0,d1,d2,d3
+		{0x1F620C20, V_FNMADD, 8}, // fnmadd d0,d1,d2,d3
+		{0x1F628C20, V_FNMSUB, 8}, // fnmsub d0,d1,d2,d3
+		{0x1F020C20, V_FMADD, 4},  // fmadd s0,s1,s2,s3
+		{0x1F028C20, V_FMSUB, 4},  // fmsub s0,s1,s2,s3
+		{0x1F220C20, V_FNMADD, 4}, // fnmadd s0,s1,s2,s3
+		{0x1F228C20, V_FNMSUB, 4}, // fnmsub s0,s1,s2,s3
+	}
+	for _, c := range cases {
+		in := d.Decode(c.raw, 0)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "width", c.w, in.Shift)
+		expect(t, "Rd", 0, in.Rd)
+		expect(t, "Rn", 1, in.Rn)
+		expect(t, "Rm", 2, in.Rm)
+		expect(t, "Ra(Imm)", int64(3), in.Imm)
+	}
+}
+
 // FP 运算翻译 emit: 确认生成对应的 VM 操作码。
 func TestTranslate_SIMDFP_FPArith(t *testing.T) {
 	d := NewDecoder()

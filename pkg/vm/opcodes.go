@@ -130,6 +130,9 @@ const (
 	OpVecNot byte = 0x3A
 	// 浮点二元: [op][subop][d][n][m][esize][nbytes] = 7B (subop 0+ 1- 2* 3/; esize 4/8)
 	OpVecFBin byte = 0x3B
+	// 标量浮点融合乘加: [op][subop][d][n][m][a][width] = 7B
+	//   subop 0 madd(a+n*m) 1 msub(a-n*m) 2 nmadd(-a-n*m) 3 nmsub(-a+n*m)
+	OpVFMAdd byte = 0x3E
 
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target

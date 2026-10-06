@@ -201,6 +201,11 @@ const (
 	V_VFSUB
 	V_VFMUL
 	V_VFDIV
+	// 标量浮点融合乘加
+	V_FMADD
+	V_FMSUB
+	V_FNMADD
+	V_FNMSUB
 	UNSUPPORTED
 )
 
@@ -387,6 +392,7 @@ func OpName(op Op) string {
 		V_VADD: "VADD", V_VSUB: "VSUB", V_VMUL: "VMUL",
 		V_VAND: "VAND", V_VBIC: "VBIC", V_VORR: "VORR", V_VORN: "VORN", V_VEOR: "VEOR",
 		V_VNOT: "VNOT", V_VFADD: "VFADD", V_VFSUB: "VFSUB", V_VFMUL: "VFMUL", V_VFDIV: "VFDIV",
+		V_FMADD: "FMADD", V_FMSUB: "FMSUB", V_FNMADD: "FNMADD", V_FNMSUB: "FNMSUB",
 	}
 	if n, ok := names[op]; ok {
 		return n

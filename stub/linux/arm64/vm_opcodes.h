@@ -104,6 +104,9 @@
 #define OP_VF_CVT 0x33  /* 转换 6B: [op][kind][d][n][inw][outw] */
 #define OP_VF_CMP 0x34  /* 比较 5B: [op][n][m][width][isZero] */
 #define OP_VF_CSEL 0x35 /* 条件选择 6B: [op][d][n][m][cond][width] */
+#define OP_VF_MADD                                                             \
+  0x3E /* 融合乘加 7B: [op][subop][d][n][m][a][width]                          \
+          (0 madd 1 msub 2 nmadd 3 nmsub) */
 
 /* ---- 基础 NEON 向量运算 (按 lane 并行) ---- */
 #define OP_VEC_BIN 0x38   /* 整数二元 7B: [op][subop][d][n][m][esize][nbytes] */

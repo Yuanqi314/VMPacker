@@ -687,6 +687,15 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		return 0, t.trVecFBin(inst, 2)
 	case V_VFDIV:
 		return 0, t.trVecFBin(inst, 3)
+	// 标量浮点融合乘加
+	case V_FMADD:
+		return 0, t.trVFMAdd(inst, 0)
+	case V_FMSUB:
+		return 0, t.trVFMAdd(inst, 1)
+	case V_FNMADD:
+		return 0, t.trVFMAdd(inst, 2)
+	case V_FNMSUB:
+		return 0, t.trVFMAdd(inst, 3)
 
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")
