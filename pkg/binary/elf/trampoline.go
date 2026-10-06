@@ -3,6 +3,7 @@ package elf
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 )
 
@@ -118,6 +119,34 @@ func BuildTokenTrampoline(funcAddr, vmEntryTokenVA uint64, token uint32) []byte 
 	writeU32(&buf, 0x14000000|uint32(bImm26))
 
 	return buf.Bytes()
+}
+
+// TokenTrampolineSize 内联 Token 跳板的字节数（3 条 ARM64 指令）。
+const TokenTrampolineSize = 12
+
+// BranchTrampolineSize 紧凑跳板在目标函数站点占用的字节数（单条 B 指令）。
+const BranchTrampolineSize = 4
+
+// BuildBranchTrampoline 构造「紧凑」跳板：目标函数处只写一条 4 字节的 B 指令，
+// 跳到位于 payload 中的 per-function thunk（thunk 再执行 3 指令 Token 跳板）。
+//
+//	B thunkVA        ; 单指令, 4 字节
+//
+// 用于目标函数过小、放不下 12 字节内联 Token 跳板的场景（最小仅需 4 字节）。
+// B 的相对范围为 ±128 MiB；超出或未 4 字节对齐则返回错误。
+func BuildBranchTrampoline(funcAddr, thunkVA uint64) ([]byte, error) {
+	off := int64(thunkVA) - int64(funcAddr)
+	if off&3 != 0 {
+		return nil, fmt.Errorf("branch target not 4-byte aligned (offset=%d)", off)
+	}
+	// imm26 << 2 为带符号 28 位：±2^27 字节 = ±128 MiB。
+	if off < -(1<<27) || off >= (1<<27) {
+		return nil, fmt.Errorf("branch target out of ±128MiB range (offset=%d)", off)
+	}
+	imm26 := uint32((off >> 2) & 0x03FFFFFF)
+	var buf bytes.Buffer
+	writeU32(&buf, 0x14000000|imm26)
+	return buf.Bytes(), nil
 }
 
 // ============================================================
