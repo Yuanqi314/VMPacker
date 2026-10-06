@@ -90,7 +90,7 @@ jobs:
           /tmp/tv_simd
           gcc -I stub/linux/arm64 -O1 -o /tmp/tv_vfp stub/linux/arm64/test_vfp_host.c -lm
           /tmp/tv_vfp
-          gcc -I stub/linux/arm64 -O1 -o /tmp/tv_vneon stub/linux/arm64/test_vneon_host.c
+          gcc -I stub/linux/arm64 -O1 -o /tmp/tv_vneon stub/linux/arm64/test_vneon_host.c -lm
           /tmp/tv_vneon
 
       - name: Build CLI (linux + windows)
