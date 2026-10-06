@@ -8,7 +8,8 @@ plugins {
 
 android {
     namespace = "com.vmpacker.app"
-    compileSdk = 36
+    // miuix 0.9.4 / Compose 1.12.1 AARs declare minCompileSdk 37 (checkAarMetadata).
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.vmpacker.app"

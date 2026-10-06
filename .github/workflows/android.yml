@@ -45,15 +45,14 @@ jobs:
       - name: Install SDK packages + accept licenses
         run: |
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          # android-36 + build-tools 36 for the app (compileSdk 36);
-          # android-24 for gomobile bind (-androidapi 24 needs that platform);
-          # an NDK for gomobile's JNI glue.
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "platforms;android-24" \
-            "ndk;27.2.12479018" || sdkmanager --install "ndk;26.3.11579264"
+          # android-37 for the app (compileSdk 37 — miuix 0.9.4 / Compose 1.12.1
+          # require it); android-24 for gomobile bind (-androidapi 24 needs that
+          # platform); an NDK for gomobile's JNI glue. Installed separately so one
+          # unavailable package can't skip the others. (AGP can also auto-download
+          # a missing platform/build-tools since the licenses are accepted.)
+          sdkmanager --install "platform-tools" "platforms;android-24" "build-tools;36.0.0"
+          sdkmanager --install "platforms;android-37" || sdkmanager --install "platforms;android-37.0" || true
+          sdkmanager --install "ndk;27.2.12479018" || sdkmanager --install "ndk;26.3.11579264"
           NDK_DIR="$(ls -d "$ANDROID_SDK_ROOT"/ndk/* 2>/dev/null | sort -V | tail -1)"
           echo "Using NDK: $NDK_DIR"
           echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
