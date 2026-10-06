@@ -226,6 +226,60 @@ func (t *Translator) trVFCsel(inst vm.Instruction) error {
 	return nil
 }
 
+// --- 基础 NEON 向量运算 ---
+
+func (t *Translator) trVecBin(inst vm.Instruction, subop byte) error {
+	d, n, m, err := t.vreg3(inst)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecBin, subop, d, n, m, byte(inst.Shift), byte(inst.Imm)) // esize, nbytes
+	return nil
+}
+
+func (t *Translator) trVecFBin(inst vm.Instruction, subop byte) error {
+	d, n, m, err := t.vreg3(inst)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecFBin, subop, d, n, m, byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
+func (t *Translator) trVecLogic(inst vm.Instruction, subop byte) error {
+	d, n, m, err := t.vreg3(inst)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecLogic, subop, d, n, m, byte(inst.Imm)) // nbytes
+	return nil
+}
+
+func (t *Translator) trVecNot(inst vm.Instruction) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecNot, d, n, byte(inst.Imm))
+	return nil
+}
+
+// vreg3 映射 Rd/Rn/Rm 三个向量寄存器。
+func (t *Translator) vreg3(inst vm.Instruction) (d, n, m byte, err error) {
+	if d, err = t.vreg(inst.Rd); err != nil {
+		return
+	}
+	if n, err = t.vreg(inst.Rn); err != nil {
+		return
+	}
+	m, err = t.vreg(inst.Rm)
+	return
+}
+
 // trVMovi 翻译 MOVI/MVNI — 把 128-bit 立即数写入 V 寄存器。
 func (t *Translator) trVMovi(inst vm.Instruction) error {
 	vt, err := t.vreg(inst.Rd)

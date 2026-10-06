@@ -83,17 +83,21 @@ var opTable = map[byte]opInfo{
 	OpVld16: {"VLD16", 3}, // op + rn + len
 	OpVst16: {"VST16", 3},
 
-	OpVLoad:   {"V_LOAD", 8},   // op + vt + base + imm32 + width
-	OpVStore:  {"V_STORE", 8},  // op + vt + base + imm32 + width
-	OpVLoadP:  {"V_LOADP", 9},  // op + vt1 + vt2 + base + imm32 + width
-	OpVStoreP: {"V_STOREP", 9}, // op + vt1 + vt2 + base + imm32 + width
-	OpVMovi:   {"V_MOVI", 18},  // op + vt + val_lo64 + val_hi64
-	OpVMov:    {"V_MOV", 5},    // op + dir + dst + src + width
-	OpVFBin:   {"VF_BIN", 6},   // op + subop + d + n + m + width
-	OpVFUn:    {"VF_UN", 5},    // op + subop + d + n + width
-	OpVFCvt:   {"VF_CVT", 6},   // op + kind + d + n + inw + outw
-	OpVFCmp:   {"VF_CMP", 5},   // op + n + m + width + isZero
-	OpVFCsel:  {"VF_CSEL", 6},  // op + d + n + m + cond + width
+	OpVLoad:    {"V_LOAD", 8},    // op + vt + base + imm32 + width
+	OpVStore:   {"V_STORE", 8},   // op + vt + base + imm32 + width
+	OpVLoadP:   {"V_LOADP", 9},   // op + vt1 + vt2 + base + imm32 + width
+	OpVStoreP:  {"V_STOREP", 9},  // op + vt1 + vt2 + base + imm32 + width
+	OpVMovi:    {"V_MOVI", 18},   // op + vt + val_lo64 + val_hi64
+	OpVMov:     {"V_MOV", 5},     // op + dir + dst + src + width
+	OpVFBin:    {"VF_BIN", 6},    // op + subop + d + n + m + width
+	OpVFUn:     {"VF_UN", 5},     // op + subop + d + n + width
+	OpVFCvt:    {"VF_CVT", 6},    // op + kind + d + n + inw + outw
+	OpVFCmp:    {"VF_CMP", 5},    // op + n + m + width + isZero
+	OpVFCsel:   {"VF_CSEL", 6},   // op + d + n + m + cond + width
+	OpVecBin:   {"VEC_BIN", 7},   // op + subop + d + n + m + esize + nbytes
+	OpVecLogic: {"VEC_LOGIC", 6}, // op + subop + d + n + m + nbytes
+	OpVecNot:   {"VEC_NOT", 4},   // op + d + n + nbytes
+	OpVecFBin:  {"VEC_FBIN", 7},  // op + subop + d + n + m + esize + nbytes
 
 	OpTbz:  {"TBZ", 7}, // op + reg + bit + target32
 	OpTbnz: {"TBNZ", 7},

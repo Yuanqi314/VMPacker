@@ -105,6 +105,12 @@
 #define OP_VF_CMP 0x34  /* 比较 5B: [op][n][m][width][isZero] */
 #define OP_VF_CSEL 0x35 /* 条件选择 6B: [op][d][n][m][cond][width] */
 
+/* ---- 基础 NEON 向量运算 (按 lane 并行) ---- */
+#define OP_VEC_BIN 0x38   /* 整数二元 7B: [op][subop][d][n][m][esize][nbytes] */
+#define OP_VEC_LOGIC 0x39 /* 位运算   6B: [op][subop][d][n][m][nbytes] */
+#define OP_VEC_NOT 0x3A   /* 取反     4B: [op][d][n][nbytes] */
+#define OP_VEC_FBIN 0x3B  /* 浮点二元 7B: [op][subop][d][n][m][esize][nbytes] */
+
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \
   0x16 /* TBZ  Xt, #bit, target          7B: [op][reg][bit][target32] */

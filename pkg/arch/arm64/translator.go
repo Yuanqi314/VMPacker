@@ -660,6 +660,33 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		return 0, t.trVFCmp(inst)
 	case V_FCSEL:
 		return 0, t.trVFCsel(inst)
+	// 基础 NEON 向量运算
+	case V_VADD:
+		return 0, t.trVecBin(inst, 0)
+	case V_VSUB:
+		return 0, t.trVecBin(inst, 1)
+	case V_VMUL:
+		return 0, t.trVecBin(inst, 2)
+	case V_VAND:
+		return 0, t.trVecLogic(inst, 0)
+	case V_VBIC:
+		return 0, t.trVecLogic(inst, 1)
+	case V_VORR:
+		return 0, t.trVecLogic(inst, 2)
+	case V_VORN:
+		return 0, t.trVecLogic(inst, 3)
+	case V_VEOR:
+		return 0, t.trVecLogic(inst, 4)
+	case V_VNOT:
+		return 0, t.trVecNot(inst)
+	case V_VFADD:
+		return 0, t.trVecFBin(inst, 0)
+	case V_VFSUB:
+		return 0, t.trVecFBin(inst, 1)
+	case V_VFMUL:
+		return 0, t.trVecFBin(inst, 2)
+	case V_VFDIV:
+		return 0, t.trVecFBin(inst, 3)
 
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")

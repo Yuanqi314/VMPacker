@@ -190,6 +190,43 @@ func TestTranslate_SIMDFP_FPArith(t *testing.T) {
 	expect(t, "emitted VF_CMP", true, gotCmp)
 }
 
+// 基础 NEON 向量运算解码 (objdump 核对): Op + esize(Shift) + nbytes(Imm)。
+func TestDecode_NEON(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw    uint32
+		op     Op
+		esize  int
+		nbytes int64
+	}{
+		{0x4E228420, V_VADD, 1, 16},  // add v.16b
+		{0x4E628420, V_VADD, 2, 16},  // add v.8h
+		{0x4EA28420, V_VADD, 4, 16},  // add v.4s
+		{0x4EE28420, V_VADD, 8, 16},  // add v.2d
+		{0x0E228420, V_VADD, 1, 8},   // add v.8b (Q=0)
+		{0x6EA28420, V_VSUB, 4, 16},  // sub v.4s
+		{0x4EA29C20, V_VMUL, 4, 16},  // mul v.4s
+		{0x4E221C20, V_VAND, 0, 16},  // and
+		{0x4EA21C20, V_VORR, 0, 16},  // orr
+		{0x6E221C20, V_VEOR, 0, 16},  // eor
+		{0x4E621C20, V_VBIC, 0, 16},  // bic
+		{0x4EE21C20, V_VORN, 0, 16},  // orn
+		{0x6E205820, V_VNOT, 0, 16},  // not
+		{0x4EA11C20, V_VORR, 0, 16},  // mov v.16b (ORR alias)
+		{0x4E22D420, V_VFADD, 4, 16}, // fadd v.4s
+		{0x4E62D420, V_VFADD, 8, 16}, // fadd v.2d
+		{0x4EA2D420, V_VFSUB, 4, 16}, // fsub v.4s
+		{0x6E62DC20, V_VFMUL, 8, 16}, // fmul v.2d
+		{0x6E22FC20, V_VFDIV, 4, 16}, // fdiv v.4s
+	}
+	for _, c := range cases {
+		in := d.Decode(c.raw, 0)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "esize", c.esize, in.Shift)
+		expect(t, "nbytes", c.nbytes, in.Imm)
+	}
+}
+
 // 验证翻译器 emit: decode→translate→disasm, 确认生成正确的 VM 操作码。
 func TestTranslate_SIMDFP_Emit(t *testing.T) {
 	d := NewDecoder()

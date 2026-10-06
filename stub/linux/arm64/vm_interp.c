@@ -29,6 +29,7 @@
 #include "vm_handlers/h_system.h" /* NOP, CALL_NAT, BR_REG, VLD16, VST16 */
 #include "vm_handlers/h_vsimd.h"  /* SIMD&FP 访存: V_LOAD/V_STORE/V_LDP/V_STP/V_MOVI/V_MOV */
 #include "vm_handlers/h_vfp.h"    /* 标量浮点运算: FADD/FSUB/FMUL/FDIV/FABS/.../FCMP/FCSEL */
+#include "vm_handlers/h_vneon.h"  /* 基础 NEON 向量运算: VADD/VSUB/VMUL/逻辑/VFADD... */
 
 
 /* ---- 间接 Dispatch 跳转表 (条件编译) ---- */

@@ -336,6 +336,80 @@ var simdfpPatterns = []InstrPattern{
 			inst.Imm = int64(vfpExpandImm(uint64(f["imm8"]), w == 8))
 		},
 	},
+
+	// ---- ASIMD 3-same: 0 Q U 01110 size 1 Rm opcode 1 Rn Rd ----
+	// 覆盖整数 ADD/SUB/MUL、逻辑 AND/BIC/ORR/ORN/EOR、浮点 FADD/FSUB/FMUL/FDIV
+	{
+		Name: "V_ASIMD_3SAME", Mask: 0x9F200400, Value: 0x0E200400, Op: V_VADD,
+		Fields: []FieldDef{
+			{Name: "Q", Hi: 30, Lo: 30}, {Name: "U", Hi: 29, Lo: 29},
+			{Name: "b23", Hi: 23, Lo: 23}, {Name: "b22", Hi: 22, Lo: 22},
+			{Name: "opcode", Hi: 15, Lo: 11}, fRm16, fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			Q, U := f["Q"], f["U"]
+			b23, b22, opc := f["b23"], f["b22"], f["opcode"]
+			if Q != 0 {
+				inst.Imm = 16 // nbytes (full)
+			} else {
+				inst.Imm = 8 // half
+			}
+			fpEs := 4
+			if b22 != 0 {
+				fpEs = 8
+			}
+			size := (b23 << 1) | b22 // 整数/逻辑用
+			switch {
+			case U == 0 && b23 == 0 && opc == 0b11010:
+				inst.Op, inst.Shift = int(V_VFADD), fpEs
+			case U == 0 && b23 == 1 && opc == 0b11010:
+				inst.Op, inst.Shift = int(V_VFSUB), fpEs
+			case U == 1 && b23 == 0 && opc == 0b11011:
+				inst.Op, inst.Shift = int(V_VFMUL), fpEs
+			case U == 1 && b23 == 0 && opc == 0b11111:
+				inst.Op, inst.Shift = int(V_VFDIV), fpEs
+			case opc == 0b10000: // ADD/SUB (整数, 按 lane)
+				inst.Shift = 1 << uint(size)
+				if U == 0 {
+					inst.Op = int(V_VADD)
+				} else {
+					inst.Op = int(V_VSUB)
+				}
+			case opc == 0b10011 && U == 0: // MUL
+				inst.Op, inst.Shift = int(V_VMUL), 1<<uint(size)
+			case opc == 0b00011: // 逻辑 (按 U,size)
+				switch {
+				case U == 0 && size == 0b00:
+					inst.Op = int(V_VAND)
+				case U == 0 && size == 0b01:
+					inst.Op = int(V_VBIC)
+				case U == 0 && size == 0b10:
+					inst.Op = int(V_VORR)
+				case U == 0 && size == 0b11:
+					inst.Op = int(V_VORN)
+				case U == 1 && size == 0b00:
+					inst.Op = int(V_VEOR)
+				default:
+					inst.Op = int(UNSUPPORTED) // BSL/BIT/BIF 暂不支持
+				}
+			default:
+				inst.Op = int(UNSUPPORTED)
+			}
+		},
+	},
+
+	// ---- ASIMD 2-reg misc: NOT/MVN ----
+	{
+		Name: "V_NOT", Mask: 0xBFFFFC00, Value: 0x2E205800, Op: V_VNOT,
+		Fields: []FieldDef{{Name: "Q", Hi: 30, Lo: 30}, fRn, fRd},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			if f["Q"] != 0 {
+				inst.Imm = 16
+			} else {
+				inst.Imm = 8
+			}
+		},
+	},
 }
 
 // fpTypeWidth: ftype(00=S,01=D,11=H) → 字节宽度 (H 暂不支持返回 0)

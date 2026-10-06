@@ -118,6 +118,19 @@ const (
 	// 条件选择: [op][d][n][m][cond][width] = 6B  (d = cond?n:m)
 	OpVFCsel byte = 0x35
 
+	// ============================================================
+	// 基础 NEON 向量运算 (对 V 寄存器按 lane 并行)
+	// esize=lane 字节 (1/2/4/8), nbytes=总字节 (8=half / 16=full)
+	// ============================================================
+	// 整数二元: [op][subop][d][n][m][esize][nbytes] = 7B (subop 0+ 1- 2*)
+	OpVecBin byte = 0x38
+	// 位运算: [op][subop][d][n][m][nbytes] = 6B (subop 0 AND 1 BIC 2 ORR 3 ORN 4 EOR)
+	OpVecLogic byte = 0x39
+	// 按位取反: [op][d][n][nbytes] = 4B (NOT/MVN)
+	OpVecNot byte = 0x3A
+	// 浮点二元: [op][subop][d][n][m][esize][nbytes] = 7B (subop 0+ 1- 2* 3/; esize 4/8)
+	OpVecFBin byte = 0x3B
+
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target
 	OpTbnz byte = 0x17 // TBNZ Xt, #bit, target

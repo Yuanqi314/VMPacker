@@ -285,6 +285,20 @@ __attribute__((noinline)) VM_SECTION_ALU static u32 hw_vfcsel(vm_ctx_t *vm) {
   return h_vfcsel(vm);
 }
 
+/* ---- 基础 NEON 向量运算 ---- */
+__attribute__((noinline)) VM_SECTION_ALU static u32 hw_vecbin(vm_ctx_t *vm) {
+  return h_vecbin(vm);
+}
+__attribute__((noinline)) VM_SECTION_ALU static u32 hw_vecfbin(vm_ctx_t *vm) {
+  return h_vecfbin(vm);
+}
+__attribute__((noinline)) VM_SECTION_ALU static u32 hw_veclogic(vm_ctx_t *vm) {
+  return h_veclogic(vm);
+}
+__attribute__((noinline)) VM_SECTION_ALU static u32 hw_vecnot(vm_ctx_t *vm) {
+  return h_vecnot(vm);
+}
+
 /* ---- TBZ/TBNZ (分支, 返回 0) ---- */
 __attribute__((noinline)) VM_SECTION_BRANCH static u32 hw_tbz(vm_ctx_t *vm) {
   h_tbz(vm);
@@ -598,6 +612,10 @@ __attribute__((noinline)) static void vm_init_jump_table(vm_handler_fn *tbl) {
   tbl[OP_VF_CVT] = hw_vfcvt;
   tbl[OP_VF_CMP] = hw_vfcmp;
   tbl[OP_VF_CSEL] = hw_vfcsel;
+  tbl[OP_VEC_BIN] = hw_vecbin;
+  tbl[OP_VEC_FBIN] = hw_vecfbin;
+  tbl[OP_VEC_LOGIC] = hw_veclogic;
+  tbl[OP_VEC_NOT] = hw_vecnot;
 
   /* TBZ/TBNZ */
   tbl[OP_TBZ] = hw_tbz;

@@ -187,6 +187,20 @@ const (
 	V_FCVT_UF // ucvtf 无符号整数→浮点
 	V_FCMP
 	V_FCSEL
+	// 基础 NEON 向量运算
+	V_VADD
+	V_VSUB
+	V_VMUL
+	V_VAND
+	V_VBIC
+	V_VORR
+	V_VORN
+	V_VEOR
+	V_VNOT
+	V_VFADD
+	V_VFSUB
+	V_VFMUL
+	V_VFDIV
 	UNSUPPORTED
 )
 
@@ -370,6 +384,9 @@ func OpName(op Op) string {
 		V_FCVT_FF: "FCVT", V_FCVT_FS: "FCVTZS", V_FCVT_FU: "FCVTZU",
 		V_FCVT_SF: "SCVTF", V_FCVT_UF: "UCVTF",
 		V_FCMP: "FCMP", V_FCSEL: "FCSEL",
+		V_VADD: "VADD", V_VSUB: "VSUB", V_VMUL: "VMUL",
+		V_VAND: "VAND", V_VBIC: "VBIC", V_VORR: "VORR", V_VORN: "VORN", V_VEOR: "VEOR",
+		V_VNOT: "VNOT", V_VFADD: "VFADD", V_VFSUB: "VFSUB", V_VFMUL: "VFMUL", V_VFDIV: "VFDIV",
 	}
 	if n, ok := names[op]; ok {
 		return n
