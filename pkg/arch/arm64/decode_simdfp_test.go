@@ -249,6 +249,48 @@ func TestTranslate_SIMDFP_Copy(t *testing.T) {
 	expect(t, "all translated", len(raws), res.TransInsts)
 }
 
+// NEON 向量比较解码 (整数 CMxx + 浮点 FCMxx)。
+func TestDecode_SIMDFP_Cmp(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw uint32
+		op  Op
+		es  int
+		nb  int64
+	}{
+		{0x4EA23420, V_VCMGT, 4, 16},  // cmgt v0.4s
+		{0x4EA23C20, V_VCMGE, 4, 16},  // cmge v0.4s
+		{0x6EA23420, V_VCMHI, 4, 16},  // cmhi v0.4s
+		{0x6EA23C20, V_VCMHS, 4, 16},  // cmhs v0.4s
+		{0x6EA28C20, V_VCMEQ, 4, 16},  // cmeq v0.4s
+		{0x4EA28C20, V_VCMTST, 4, 16}, // cmtst v0.4s
+		{0x4E223420, V_VCMGT, 1, 16},  // cmgt v0.16b
+		{0x6EE28C20, V_VCMEQ, 8, 16},  // cmeq v0.2d
+		{0x4E22E420, V_VFCMEQ, 4, 16}, // fcmeq v0.4s
+		{0x6E22E420, V_VFCMGE, 4, 16}, // fcmge v0.4s
+		{0x6EA2E420, V_VFCMGT, 4, 16}, // fcmgt v0.4s
+		{0x4E62E420, V_VFCMEQ, 8, 16}, // fcmeq v0.2d
+		{0x6EE2E420, V_VFCMGT, 8, 16}, // fcmgt v0.2d
+	}
+	for _, c := range cases {
+		in := d.Decode(c.raw, 0)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "es", c.es, in.Shift)
+		expect(t, "nbytes", c.nb, in.Imm)
+	}
+	tr := NewTranslator(0x400000, 0x20)
+	insts := make([]vm.Instruction, len(cases))
+	for i, c := range cases {
+		insts[i] = d.Decode(c.raw, i*4)
+	}
+	res, err := tr.Translate(insts)
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	expect(t, "all translated", len(cases), res.TransInsts)
+}
+
 // FP 运算翻译 emit: 确认生成对应的 VM 操作码。
 func TestTranslate_SIMDFP_FPArith(t *testing.T) {
 	d := NewDecoder()

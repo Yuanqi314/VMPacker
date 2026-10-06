@@ -177,6 +177,8 @@ static inline u8 vm_insn_size(u8 op) {
   case OP_VEC_FBIN:
   case OP_VF_MADD:
   case OP_V_MOV2R:
+  case OP_VEC_CMP:
+  case OP_VEC_FCMP:
     return 7;
   case OP_V_DUP_E:
   case OP_V_INS_E:

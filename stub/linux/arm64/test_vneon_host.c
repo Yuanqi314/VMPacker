@@ -164,6 +164,51 @@ int main(void) {
           "ins 元素保留其它 lane");
   }
 
+  /* ---- 整数比较 CMGT/CMHI/CMEQ/CMTST (v.4s) ---- */
+  {
+    /* a = [-1, 5, 7, 0], b = [0, 5, 3, 0] (按 s32) */
+    setlane(1, 0, 4, (u32)-1); setlane(1, 4, 4, 5); setlane(1, 8, 4, 7); setlane(1, 12, 4, 0);
+    setlane(2, 0, 4, 0); setlane(2, 4, 4, 5); setlane(2, 8, 4, 3); setlane(2, 12, 4, 0);
+    bc[0] = OP_VEC_CMP; bc[1] = 1; bc[2] = 0; bc[3] = 1; bc[4] = 2; bc[5] = 4; bc[6] = 16; /* CMGT signed */
+    vm.pc = 0;
+    u32 sz = h_veccmp(&vm);
+    CHECK(sz == 7, "veccmp size 7");
+    CHECK(getlane(0, 0, 4) == 0 && getlane(0, 4, 4) == 0 &&
+          getlane(0, 8, 4) == 0xFFFFFFFF && getlane(0, 12, 4) == 0,
+          "cmgt signed: -1>0 假, 5>5 假, 7>3 真");
+    bc[1] = 3; vm.pc = 0; h_veccmp(&vm); /* CMHI unsigned: -1(=大) > 0 真 */
+    CHECK(getlane(0, 0, 4) == 0xFFFFFFFF && getlane(0, 8, 4) == 0xFFFFFFFF,
+          "cmhi unsigned: 0xFFFFFFFF>0 真");
+    bc[1] = 0; vm.pc = 0; h_veccmp(&vm); /* CMEQ */
+    CHECK(getlane(0, 4, 4) == 0xFFFFFFFF && getlane(0, 12, 4) == 0xFFFFFFFF &&
+          getlane(0, 0, 4) == 0, "cmeq: 5==5 真, 0==0 真, -1==0 假");
+    setlane(1, 0, 4, 0x6); setlane(2, 0, 4, 0x1);
+    bc[1] = 5; vm.pc = 0; h_veccmp(&vm); /* CMTST: 6&1=0 → 假 */
+    CHECK(getlane(0, 0, 4) == 0, "cmtst: 6&1=0 假");
+    setlane(2, 0, 4, 0x2);
+    vm.pc = 0; h_veccmp(&vm); /* 6&2=2 → 真 */
+    CHECK(getlane(0, 0, 4) == 0xFFFFFFFF, "cmtst: 6&2 真");
+  }
+  /* ---- 浮点比较 FCMEQ/FCMGE/FCMGT (v.4s), 含 NaN ---- */
+  {
+    float av[4] = {1.0f, 2.0f, 3.0f, 0.0f};
+    float bv[4] = {1.0f, 5.0f, 1.0f, 0.0f};
+    for (int i = 0; i < 4; i++) { vn_wrf(vm.V[1], i * 4, av[i]); vn_wrf(vm.V[2], i * 4, bv[i]); }
+    bc[0] = OP_VEC_FCMP; bc[1] = 2; bc[2] = 0; bc[3] = 1; bc[4] = 2; bc[5] = 4; bc[6] = 16; /* FCMGT */
+    vm.pc = 0;
+    u32 sz = h_vecfcmp(&vm);
+    CHECK(sz == 7, "vecfcmp size 7");
+    CHECK(getlane(0, 0, 4) == 0 && getlane(0, 8, 4) == 0xFFFFFFFF,
+          "fcmgt: 1>1 假, 3>1 真");
+    bc[1] = 0; vm.pc = 0; h_vecfcmp(&vm); /* FCMEQ */
+    CHECK(getlane(0, 0, 4) == 0xFFFFFFFF && getlane(0, 12, 4) == 0xFFFFFFFF,
+          "fcmeq: 1==1 真, 0==0 真");
+    /* NaN: 任意比较为假 */
+    vn_wrf(vm.V[1], 0, __builtin_nanf("")); /* NaN */
+    bc[1] = 1; vm.pc = 0; h_vecfcmp(&vm); /* FCMGE */
+    CHECK(getlane(0, 0, 4) == 0, "fcmge NaN 无序→假");
+  }
+
   printf("\n%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);
   return fails ? 1 : 0;
 }

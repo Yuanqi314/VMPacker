@@ -121,6 +121,13 @@
 #define OP_V_INS_G 0x42 /* INS 通用 5B: [op][d][rn][es][index] */
 #define OP_V_INS_E 0x43 /* INS 元素 6B: [op][d][n][es][didx][sidx] */
 
+/* ---- NEON 向量比较 (逐 lane, 真→全 1 / 假→全 0) ---- */
+#define OP_VEC_CMP                                                             \
+  0x45 /* 整数 7B: [op][subop][d][n][m][es][nbytes]                            \
+          (0 EQ 1 GT 2 GE 3 HI 4 HS 5 TST) */
+#define OP_VEC_FCMP                                                            \
+  0x46 /* 浮点 7B: [op][subop][d][n][m][es][nbytes] (0 EQ 1 GE 2 GT) */
+
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \
   0x16 /* TBZ  Xt, #bit, target          7B: [op][reg][bit][target32] */

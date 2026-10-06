@@ -59,6 +59,15 @@ static inline void vn_wrd(u8 *p, int off, double d) {
   vn_wrlane(p, off, 8, x.u);
 }
 
+/* 把 es 字节的 lane 值按 es*8 位符号扩展到 i64 */
+static inline i64 vn_sext(u64 v, int es) {
+  int bits = es * 8;
+  if (bits >= 64)
+    return (i64)v;
+  u64 m = (u64)1 << (bits - 1);
+  return (i64)((v ^ m) - m);
+}
+
 /* 写回 tmp[0..nb) 到 V[d], 并清零高位 (nb..16) */
 static inline void vn_commit(vm_ctx_t *vm, u8 d, const u8 *tmp, int nb) {
   u8 *pd = vm->V[d & 31];
@@ -217,6 +226,64 @@ static inline u32 h_vinse(vm_ctx_t *vm) {
   u64 val = vn_rdlane(vm->V[n & 31], sidx * es, es); /* 先读, 避免 d==n 别名 */
   vn_wrlane(vm->V[d & 31], didx * es, es, val);
   return 6;
+}
+
+/* ---- NEON 向量比较 (逐 lane, 真→全 1 / 假→全 0) ---- */
+
+/* 整数比较: [op][subop][d][n][m][es][nbytes]
+ *   subop 0 EQ 1 GT(有符号) 2 GE(有符号) 3 HI(无符号>) 4 HS(无符号>=) 5 TST */
+static inline u32 h_veccmp(vm_ctx_t *vm) {
+  u8 sub = vm->bc[vm->pc + 1], d = vm->bc[vm->pc + 2], n = vm->bc[vm->pc + 3];
+  u8 m = vm->bc[vm->pc + 4], es = vm->bc[vm->pc + 5], nb = vm->bc[vm->pc + 6];
+  const u8 *pn = vm->V[n & 31], *pm = vm->V[m & 31];
+  u8 tmp[16];
+  u64 mask = (es >= 8) ? ~(u64)0 : (((u64)1 << (es * 8)) - 1);
+  for (int off = 0; off + es <= nb; off += es) {
+    u64 a = vn_rdlane(pn, off, es), b = vn_rdlane(pm, off, es);
+    int res = 0;
+    switch (sub) {
+    case 0: res = (a == b); break;
+    case 1: res = (vn_sext(a, es) > vn_sext(b, es)); break;
+    case 2: res = (vn_sext(a, es) >= vn_sext(b, es)); break;
+    case 3: res = (a > b); break;
+    case 4: res = (a >= b); break;
+    case 5: res = ((a & b) != 0); break;
+    }
+    vn_wrlane(tmp, off, es, res ? mask : 0);
+  }
+  vn_commit(vm, d, tmp, nb);
+  return 7;
+}
+
+/* 浮点比较: [op][subop][d][n][m][es][nbytes]  subop 0 EQ 1 GE 2 GT
+ * 无序 (NaN) 一律为假 → 全 0, 与 FCMEQ/FCMGE/FCMGT 一致 */
+static inline u32 h_vecfcmp(vm_ctx_t *vm) {
+  u8 sub = vm->bc[vm->pc + 1], d = vm->bc[vm->pc + 2], n = vm->bc[vm->pc + 3];
+  u8 m = vm->bc[vm->pc + 4], es = vm->bc[vm->pc + 5], nb = vm->bc[vm->pc + 6];
+  const u8 *pn = vm->V[n & 31], *pm = vm->V[m & 31];
+  u8 tmp[16];
+  for (int off = 0; off + es <= nb; off += es) {
+    int res = 0;
+    if (es == 8) {
+      double a = vn_rdd(pn, off), b = vn_rdd(pm, off);
+      switch (sub) {
+      case 0: res = (a == b); break;
+      case 1: res = (a >= b); break;
+      case 2: res = (a > b); break;
+      }
+      vn_wrlane(tmp, off, 8, res ? ~(u64)0 : 0);
+    } else {
+      float a = vn_rdf(pn, off), b = vn_rdf(pm, off);
+      switch (sub) {
+      case 0: res = (a == b); break;
+      case 1: res = (a >= b); break;
+      case 2: res = (a > b); break;
+      }
+      vn_wrlane(tmp, off, 4, res ? 0xFFFFFFFFu : 0);
+    }
+  }
+  vn_commit(vm, d, tmp, nb);
+  return 7;
 }
 
 #endif /* H_VNEON_H */

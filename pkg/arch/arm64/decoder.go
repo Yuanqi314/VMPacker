@@ -213,6 +213,16 @@ const (
 	V_SMOV  // SMOV Rd, Vn.Ts[index] (符号扩展)
 	V_INS_G // INS Vd.Ts[index], Rn
 	V_INS_E // INS Vd.Ts[idx1], Vn.Ts[idx2]
+	// NEON 向量比较
+	V_VCMEQ  // 整数 ==
+	V_VCMGT  // 整数 > (有符号)
+	V_VCMGE  // 整数 >= (有符号)
+	V_VCMHI  // 整数 > (无符号)
+	V_VCMHS  // 整数 >= (无符号)
+	V_VCMTST // 整数 位与非零
+	V_VFCMEQ // 浮点 ==
+	V_VFCMGE // 浮点 >=
+	V_VFCMGT // 浮点 >
 	UNSUPPORTED
 )
 
@@ -402,6 +412,9 @@ func OpName(op Op) string {
 		V_FMADD: "FMADD", V_FMSUB: "FMSUB", V_FNMADD: "FNMADD", V_FNMSUB: "FNMSUB",
 		V_DUP_E: "DUP(e)", V_DUP_G: "DUP(g)", V_UMOV: "UMOV", V_SMOV: "SMOV",
 		V_INS_G: "INS(g)", V_INS_E: "INS(e)",
+		V_VCMEQ: "CMEQ", V_VCMGT: "CMGT", V_VCMGE: "CMGE", V_VCMHI: "CMHI",
+		V_VCMHS: "CMHS", V_VCMTST: "CMTST",
+		V_VFCMEQ: "FCMEQ", V_VFCMGE: "FCMGE", V_VFCMGT: "FCMGT",
 	}
 	if n, ok := names[op]; ok {
 		return n

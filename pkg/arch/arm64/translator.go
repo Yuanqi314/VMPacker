@@ -709,6 +709,25 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		return 0, t.trVInsGen(inst)
 	case V_INS_E:
 		return 0, t.trVInsElem(inst)
+	// NEON 向量比较
+	case V_VCMEQ:
+		return 0, t.trVecCmp(inst, 0)
+	case V_VCMGT:
+		return 0, t.trVecCmp(inst, 1)
+	case V_VCMGE:
+		return 0, t.trVecCmp(inst, 2)
+	case V_VCMHI:
+		return 0, t.trVecCmp(inst, 3)
+	case V_VCMHS:
+		return 0, t.trVecCmp(inst, 4)
+	case V_VCMTST:
+		return 0, t.trVecCmp(inst, 5)
+	case V_VFCMEQ:
+		return 0, t.trVecFCmp(inst, 0)
+	case V_VFCMGE:
+		return 0, t.trVecFCmp(inst, 1)
+	case V_VFCMGT:
+		return 0, t.trVecFCmp(inst, 2)
 
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")

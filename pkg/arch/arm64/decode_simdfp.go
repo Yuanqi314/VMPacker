@@ -461,6 +461,33 @@ var simdfpPatterns = []InstrPattern{
 				}
 			case opc == 0b10011 && U == 0: // MUL
 				inst.Op, inst.Shift = int(V_VMUL), 1<<uint(size)
+			case opc == 0b11100 && U == 0 && b23 == 0: // FCMEQ
+				inst.Op, inst.Shift = int(V_VFCMEQ), fpEs
+			case opc == 0b11100 && U == 1 && b23 == 0: // FCMGE
+				inst.Op, inst.Shift = int(V_VFCMGE), fpEs
+			case opc == 0b11100 && U == 1 && b23 == 1: // FCMGT
+				inst.Op, inst.Shift = int(V_VFCMGT), fpEs
+			case opc == 0b00110: // CMGT (U=0) / CMHI (U=1)
+				inst.Shift = 1 << uint(size)
+				if U == 0 {
+					inst.Op = int(V_VCMGT)
+				} else {
+					inst.Op = int(V_VCMHI)
+				}
+			case opc == 0b00111: // CMGE (U=0) / CMHS (U=1)
+				inst.Shift = 1 << uint(size)
+				if U == 0 {
+					inst.Op = int(V_VCMGE)
+				} else {
+					inst.Op = int(V_VCMHS)
+				}
+			case opc == 0b10001: // CMTST (U=0) / CMEQ (U=1)
+				inst.Shift = 1 << uint(size)
+				if U == 0 {
+					inst.Op = int(V_VCMTST)
+				} else {
+					inst.Op = int(V_VCMEQ)
+				}
 			case opc == 0b00011: // 逻辑 (按 U,size)
 				switch {
 				case U == 0 && size == 0b00:

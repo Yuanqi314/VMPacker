@@ -150,6 +150,13 @@ const (
 	// INS 元素: [op][d][n][esize][didx][sidx] = 6B      (Vd[didx] = Vn[sidx])
 	OpVInsElem byte = 0x43
 
+	// NEON 向量比较 (逐 lane, 真→全 1 / 假→全 0)
+	// 整数: [op][subop][d][n][m][esize][nbytes] = 7B
+	//   subop 0 EQ 1 GT(有符号) 2 GE(有符号) 3 HI(无符号>) 4 HS(无符号>=) 5 TST
+	OpVecCmp byte = 0x45
+	// 浮点: [op][subop][d][n][m][esize][nbytes] = 7B  (subop 0 EQ 1 GE 2 GT)
+	OpVecFCmp byte = 0x46
+
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target
 	OpTbnz byte = 0x17 // TBNZ Xt, #bit, target

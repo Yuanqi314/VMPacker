@@ -369,6 +369,26 @@ func (t *Translator) trVecLogic(inst vm.Instruction, subop byte) error {
 	return nil
 }
 
+// trVecCmp 翻译整数向量比较。subop: 0 EQ 1 GT 2 GE 3 HI 4 HS 5 TST。
+func (t *Translator) trVecCmp(inst vm.Instruction, subop byte) error {
+	d, n, m, err := t.vreg3(inst)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecCmp, subop, d, n, m, byte(inst.Shift), byte(inst.Imm)) // esize, nbytes
+	return nil
+}
+
+// trVecFCmp 翻译浮点向量比较。subop: 0 EQ 1 GE 2 GT。
+func (t *Translator) trVecFCmp(inst vm.Instruction, subop byte) error {
+	d, n, m, err := t.vreg3(inst)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecFCmp, subop, d, n, m, byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
 func (t *Translator) trVecNot(inst vm.Instruction) error {
 	d, err := t.vreg(inst.Rd)
 	if err != nil {
