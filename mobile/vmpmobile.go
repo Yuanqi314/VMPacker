@@ -6,10 +6,13 @@
 // binding stays small and stable. Structured data crosses the boundary as JSON
 // strings, which avoids gomobile's struct/slice marshaling limitations.
 //
-// Build (produces an .aar consumed by the Android app):
+// Build (produces an .aar consumed by the Android app). The Go package name
+// "vmpmobile" + -javapkg "com.vmpacker" yields the Kotlin class
+// com.vmpacker.vmpmobile.Vmpmobile (static methods analyze/protect/blobSize)
+// and the interface com.vmpacker.vmpmobile.Logger (method log):
 //
 //	gomobile bind -target=android/arm64,android/arm \
-//	    -androidapi 24 -javapkg com.vmpacker.mobile \
+//	    -androidapi 24 -javapkg com.vmpacker \
 //	    -o android/app/libs/vmpmobile.aar ./mobile
 package vmpmobile
 

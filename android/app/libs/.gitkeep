@@ -1,0 +1,2 @@
+# CI drops the gomobile-generated vmpmobile.aar here (git-ignored).
+# This .gitkeep keeps the directory present in the repo.

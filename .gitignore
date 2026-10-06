@@ -27,10 +27,10 @@ android/captures/
 *.apk
 *.ap_
 
-# 编译出的 vmpacker 可执行文件
-vmpacker
-vmpacker.exe
-vmpacker-*-*
+# 编译出的 vmpacker 可执行文件 (仅根目录; 用 / 锚定以免误伤 com/vmpacker 等目录)
+/vmpacker
+/vmpacker.exe
+/vmpacker-*-*
 
 # 翻译失败 / debug 对照文件
 *.debug.txt

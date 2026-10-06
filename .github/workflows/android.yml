@@ -1,0 +1,151 @@
+# ============================================================
+# Android — build the VMPacker Jetpack Compose app on every commit.
+#
+# Single job (the generated blob, the gomobile .aar and the Gradle build must
+# all stay on one runner):
+#   1. checkout + toolchains (JDK 21, Go, Android SDK/NDK)
+#   2. compile stub/linux/arm64/vm_interp.c with the aarch64 cross toolchain and
+#      prepend the 24-byte <QQQ> symbol header  ->  mobile/vm_interp.bin
+#      (same recipe as .github/workflows/ci.yml)
+#   3. gomobile bind  ->  android/app/libs/vmpmobile.aar
+#   4. ./gradlew assembleDebug  ->  upload the debug APK
+# ============================================================
+name: Android
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Build Android app (debug APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # ── Toolchains ────────────────────────────────────────
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: stable
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install SDK packages + accept licenses
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          # android-36 + build-tools 36 for the app (compileSdk 36);
+          # android-24 for gomobile bind (-androidapi 24 needs that platform);
+          # an NDK for gomobile's JNI glue.
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "platforms;android-24" \
+            "ndk;27.2.12479018" || sdkmanager --install "ndk;26.3.11579264"
+          NDK_DIR="$(ls -d "$ANDROID_SDK_ROOT"/ndk/* 2>/dev/null | sort -V | tail -1)"
+          echo "Using NDK: $NDK_DIR"
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK_DIR" >> "$GITHUB_ENV"
+
+      # ── ARM64 cross toolchain for the VM interpreter stub ──
+      - name: Install ARM64 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      - name: Compile VM stub (aarch64 ELF)
+        run: |
+          mkdir -p build/stub
+          aarch64-linux-gnu-gcc \
+            -c -Os -mcmodel=tiny -fno-stack-protector \
+            -fno-builtin -nostdlib -march=armv8-a \
+            -DVM_INDIRECT_DISPATCH -DVM_FUNC_SPLIT -DVM_TOKEN_ENTRY \
+            stub/linux/arm64/vm_interp.c -o build/stub/vm_interp.o
+
+          aarch64-linux-gnu-ld -T stub/linux/arm64/vm_interp.lds \
+            -o build/stub/vm_interp.elf build/stub/vm_interp.o
+
+          aarch64-linux-gnu-objcopy -O binary \
+            build/stub/vm_interp.elf build/vm_interp_raw.bin
+
+      - name: Generate embedded blob (24-byte <QQQ> symbol header)
+        run: |
+          python3 << 'PYEOF'
+          import struct, subprocess, os
+          nm = subprocess.check_output(
+              ['aarch64-linux-gnu-nm', 'build/stub/vm_interp.elf']
+          ).decode()
+
+          def find_sym(name):
+              for line in nm.splitlines():
+                  parts = line.split()
+                  if len(parts) >= 3 and parts[2] == name:
+                      return int(parts[0], 16)
+              raise ValueError(f'Symbol {name} not found')
+
+          vm_entry       = find_sym('vm_entry')
+          vm_entry_token = find_sym('vm_entry_token')
+          token_table_va = find_sym('_token_table_va')
+          hdr  = struct.pack('<QQQ', vm_entry, vm_entry_token, token_table_va)
+          raw  = open('build/vm_interp_raw.bin', 'rb').read()
+          blob = hdr + raw
+
+          # //go:embed vm_interp.bin target lives in the gomobile package.
+          dst = 'mobile/vm_interp.bin'
+          os.makedirs(os.path.dirname(dst), exist_ok=True)
+          open(dst, 'wb').write(blob)
+          print(f'[+] {dst}: {len(blob)} bytes')
+          print(f'    vm_entry=0x{vm_entry:X}  vm_entry_token=0x{vm_entry_token:X}  _token_table_va=0x{token_table_va:X}')
+          PYEOF
+
+      # ── gomobile bind -> .aar ──────────────────────────────
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve x/mobile bind dependency
+        run: go get golang.org/x/mobile/bind@latest
+
+      - name: gomobile init
+        run: gomobile init
+
+      - name: gomobile bind (produce vmpmobile.aar)
+        run: |
+          mkdir -p android/app/libs
+          gomobile bind \
+            -target=android/arm64,android/arm \
+            -androidapi 24 \
+            -javapkg com.vmpacker \
+            -o android/app/libs/vmpmobile.aar \
+            ./mobile
+          ls -la android/app/libs/
+
+      # ── Gradle: assemble the debug APK ─────────────────────
+      - name: Grant execute permission to gradlew
+        working-directory: android
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: vmpacker-android-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

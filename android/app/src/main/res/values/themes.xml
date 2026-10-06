@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A bare no-action-bar platform theme. The actual UI is drawn by Compose +
+      MiuixTheme; this only governs the window background before the first frame.
+      Parented on a platform theme so the app needs no AppCompat/Material XML
+      dependency.
+    -->
+    <style name="Theme.VMPacker" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

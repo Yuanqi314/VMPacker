@@ -1,0 +1,22 @@
+# Version catalog — the single source of truth for the Android app's build
+# constellation. These versions mirror what miuix-ui:0.9.4 is built against
+# (JetBrains Compose Multiplatform 1.12.1 / Kotlin 2.4.20 / AGP 9.4.1), which is
+# the known-good path for consuming it from an Android-only app.
+[versions]
+agp = "9.4.1"
+kotlin = "2.4.20"
+composeMultiplatform = "1.12.1"
+miuix = "0.9.4"
+activityCompose = "1.13.0"
+coroutines = "1.9.0"
+
+[libraries]
+miuix-ui = { group = "top.yukonga.miuix.kmp", name = "miuix-ui", version.ref = "miuix" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
