@@ -231,6 +231,17 @@ const (
 	V_VUCVTF  // int → fp (无符号)
 	V_VFCVTZS // fp → int (有符号, 向零截断)
 	V_VFCVTZU // fp → int (无符号, 向零截断)
+	// NEON 置换 / 反转 / 提取
+	V_ZIP1
+	V_ZIP2
+	V_UZP1
+	V_UZP2
+	V_TRN1
+	V_TRN2
+	V_REV16
+	V_REV32
+	V_REV64
+	V_EXT
 	UNSUPPORTED
 )
 
@@ -426,6 +437,9 @@ func OpName(op Op) string {
 		V_VFMLA: "FMLA", V_VFMLS: "FMLS",
 		V_VSCVTF: "SCVTF(v)", V_VUCVTF: "UCVTF(v)",
 		V_VFCVTZS: "FCVTZS(v)", V_VFCVTZU: "FCVTZU(v)",
+		V_ZIP1: "ZIP1", V_ZIP2: "ZIP2", V_UZP1: "UZP1", V_UZP2: "UZP2",
+		V_TRN1: "TRN1", V_TRN2: "TRN2",
+		V_REV16: "REV16", V_REV32: "REV32", V_REV64: "REV64", V_EXT: "EXT",
 	}
 	if n, ok := names[op]; ok {
 		return n

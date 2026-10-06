@@ -110,6 +110,9 @@ var opTable = map[byte]opInfo{
 	OpVecFCmp: {"VEC_FCMP", 7}, // op + subop + d + n + m + esize + nbytes
 	OpVecFma:  {"VEC_FMA", 7},  // op + subop + d + n + m + esize + nbytes
 	OpVecCvt:  {"VEC_CVT", 6},  // op + subop + d + n + esize + nbytes
+	OpVecPerm: {"VEC_PERM", 7}, // op + subop + d + n + m + esize + nbytes
+	OpVecRev:  {"VEC_REV", 6},  // op + d + n + container + esize + nbytes
+	OpVecExt:  {"VEC_EXT", 6},  // op + d + n + m + index + nbytes
 
 	OpTbz:  {"TBZ", 7}, // op + reg + bit + target32
 	OpTbnz: {"TBNZ", 7},

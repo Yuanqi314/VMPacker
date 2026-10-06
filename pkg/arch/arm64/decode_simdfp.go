@@ -526,13 +526,64 @@ var simdfpPatterns = []InstrPattern{
 		},
 	},
 
-	// ---- ASIMD 2-reg misc: 整数↔浮点转换 ----
-	// 0 Q U 01110 size 10000 opcode 10 Rn Rd
-	//   SCVTF/UCVTF (opcode 11101, int→fp), FCVTZS/FCVTZU (opcode 11011, fp→int)
-	// 宽解码 (匹配 2-reg-misc 固定位), 非转换 opcode 在 Post 里置 UNSUPPORTED。
+	// ---- ASIMD 置换: ZIP1/ZIP2/UZP1/UZP2/TRN1/TRN2 ----
+	// 0 Q 001110 size 0 Rm 0 opcode 10 Rn Rd  (opcode[14:12] 区分)
+	{
+		Name: "V_ASIMD_PERM", Mask: 0xBF208C00, Value: 0x0E000800, Op: V_ZIP1,
+		Fields: []FieldDef{
+			{Name: "Q", Hi: 30, Lo: 30}, {Name: "size", Hi: 23, Lo: 22},
+			{Name: "opcode", Hi: 14, Lo: 12}, fRm16, fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			if f["Q"] != 0 {
+				inst.Imm = 16
+			} else {
+				inst.Imm = 8
+			}
+			inst.Shift = 1 << uint(f["size"]) // 元素字节
+			switch f["opcode"] {
+			case 0b001:
+				inst.Op = int(V_UZP1)
+			case 0b010:
+				inst.Op = int(V_TRN1)
+			case 0b011:
+				inst.Op = int(V_ZIP1)
+			case 0b101:
+				inst.Op = int(V_UZP2)
+			case 0b110:
+				inst.Op = int(V_TRN2)
+			case 0b111:
+				inst.Op = int(V_ZIP2)
+			default:
+				inst.Op = int(UNSUPPORTED)
+			}
+		},
+	},
+
+	// ---- ASIMD EXT: 0 Q 101110 00 0 Rm 0 imm4 0 Rn Rd ----
+	{
+		Name: "V_ASIMD_EXT", Mask: 0xBFE08400, Value: 0x2E000000, Op: V_EXT,
+		Fields: []FieldDef{
+			{Name: "Q", Hi: 30, Lo: 30}, fRm16,
+			{Name: "imm4", Hi: 14, Lo: 11}, fRn, fRd,
+		},
+		Post: func(f map[string]int64, inst *vm.Instruction) {
+			nb := int64(8)
+			if f["Q"] != 0 {
+				nb = 16
+			}
+			inst.Imm = nb
+			inst.Shift = int(f["imm4"]) // 提取起始字节
+			// Q=0 时 imm4 的高位必须为 0 (否则是 UNDEFINED), 这里不额外校验
+		},
+	},
+
+	// ---- ASIMD 2-reg misc: 整数↔浮点转换 + 元素反转 REV16/32/64 ----
+	// 0 Q U 01110 size 10000 opcode 10 Rn Rd  (宽解码, 非目标 opcode → UNSUPPORTED)
+	//   SCVTF/UCVTF (11101), FCVTZS/FCVTZU (11011), REV16/64 (00000/00001)
 	// 必须排在 V_NOT 之后 (NOT 先匹配其专属编码)。
 	{
-		Name: "V_ASIMD_CVT", Mask: 0x9F3E0C00, Value: 0x0E200800, Op: V_VSCVTF,
+		Name: "V_ASIMD_2MISC", Mask: 0x9F3E0C00, Value: 0x0E200800, Op: V_VSCVTF,
 		Fields: []FieldDef{
 			{Name: "Q", Hi: 30, Lo: 30}, {Name: "U", Hi: 29, Lo: 29},
 			{Name: "size", Hi: 23, Lo: 22}, {Name: "opcode", Hi: 16, Lo: 12},
@@ -545,25 +596,34 @@ var simdfpPatterns = []InstrPattern{
 			} else {
 				inst.Imm = 8
 			}
-			if size&1 != 0 { // bit22: 0→S(4) 1→D(8)
-				inst.Shift = 8
-			} else {
-				inst.Shift = 4
-			}
 			switch {
 			case opc == 0b11101 && U == 0:
-				inst.Op = int(V_VSCVTF)
+				inst.Op, inst.Shift = int(V_VSCVTF), cvtEs(size)
 			case opc == 0b11101 && U == 1:
-				inst.Op = int(V_VUCVTF)
+				inst.Op, inst.Shift = int(V_VUCVTF), cvtEs(size)
 			case opc == 0b11011 && U == 0:
-				inst.Op = int(V_VFCVTZS)
+				inst.Op, inst.Shift = int(V_VFCVTZS), cvtEs(size)
 			case opc == 0b11011 && U == 1:
-				inst.Op = int(V_VFCVTZU)
+				inst.Op, inst.Shift = int(V_VFCVTZU), cvtEs(size)
+			case opc == 0b00000 && U == 0: // REV64: container 8 字节
+				inst.Op, inst.Shift, inst.Cond = int(V_REV64), 1<<uint(size), 8
+			case opc == 0b00000 && U == 1: // REV32: container 4 字节
+				inst.Op, inst.Shift, inst.Cond = int(V_REV32), 1<<uint(size), 4
+			case opc == 0b00001 && U == 0: // REV16: container 2 字节
+				inst.Op, inst.Shift, inst.Cond = int(V_REV16), 1<<uint(size), 2
 			default:
 				inst.Op = int(UNSUPPORTED)
 			}
 		},
 	},
+}
+
+// cvtEs: 2-reg-misc 转换指令的 size(bit22) → 元素字节 (0→S/4, 1→D/8)
+func cvtEs(size int64) int {
+	if size&1 != 0 {
+		return 8
+	}
+	return 4
 }
 
 // decodeImm5 解析 AdvSIMD copy 的 imm5: 最低置位决定元素大小, 其余位为索引。

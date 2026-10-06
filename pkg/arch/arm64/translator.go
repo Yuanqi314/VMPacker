@@ -741,6 +741,23 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		return 0, t.trVecCvt(inst, 2)
 	case V_VFCVTZU:
 		return 0, t.trVecCvt(inst, 3)
+	// NEON 置换 / 反转 / 提取
+	case V_ZIP1:
+		return 0, t.trVecPerm(inst, 0)
+	case V_ZIP2:
+		return 0, t.trVecPerm(inst, 1)
+	case V_UZP1:
+		return 0, t.trVecPerm(inst, 2)
+	case V_UZP2:
+		return 0, t.trVecPerm(inst, 3)
+	case V_TRN1:
+		return 0, t.trVecPerm(inst, 4)
+	case V_TRN2:
+		return 0, t.trVecPerm(inst, 5)
+	case V_REV16, V_REV32, V_REV64:
+		return 0, t.trVecRev(inst)
+	case V_EXT:
+		return 0, t.trVecExt(inst)
 
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")

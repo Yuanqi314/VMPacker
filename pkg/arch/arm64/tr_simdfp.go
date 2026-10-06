@@ -413,6 +413,40 @@ func (t *Translator) trVecCvt(inst vm.Instruction, subop byte) error {
 	return nil
 }
 
+// trVecPerm 翻译向量置换。subop: 0 ZIP1 1 ZIP2 2 UZP1 3 UZP2 4 TRN1 5 TRN2。
+func (t *Translator) trVecPerm(inst vm.Instruction, subop byte) error {
+	d, n, m, err := t.vreg3(inst)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecPerm, subop, d, n, m, byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
+// trVecRev 翻译元素反转 (REV16/32/64)。container 存于 inst.Cond, esize 存于 inst.Shift。
+func (t *Translator) trVecRev(inst vm.Instruction) error {
+	d, err := t.vreg(inst.Rd)
+	if err != nil {
+		return err
+	}
+	n, err := t.vreg(inst.Rn)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecRev, d, n, byte(inst.Cond), byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
+// trVecExt 翻译 EXT (从 concat(Vn:Vm) 的第 index 字节起取 nbytes)。
+func (t *Translator) trVecExt(inst vm.Instruction) error {
+	d, n, m, err := t.vreg3(inst)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecExt, d, n, m, byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
 func (t *Translator) trVecNot(inst vm.Instruction) error {
 	d, err := t.vreg(inst.Rd)
 	if err != nil {

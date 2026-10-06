@@ -357,6 +357,60 @@ func TestDecode_SIMDFP_VCvt(t *testing.T) {
 	expect(t, "all translated", len(cases), res.TransInsts)
 }
 
+// NEON 置换/反转/提取解码 (ZIP/UZP/TRN/REV/EXT)。
+func TestDecode_SIMDFP_Perm(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw  uint32
+		op   Op
+		es   int   // Shift (REV: 元素字节; PERM: 元素字节; EXT: index)
+		aux  int   // Cond (REV container), 其它为 0
+		nb   int64 // Imm (REV/PERM: nbytes; EXT: nbytes)
+		isEx bool  // EXT 用 Shift 存 index
+	}{
+		{0x4E823820, V_ZIP1, 4, 0, 16, false},  // zip1 v0.4s
+		{0x4E827820, V_ZIP2, 4, 0, 16, false},  // zip2 v0.4s
+		{0x4E821820, V_UZP1, 4, 0, 16, false},  // uzp1 v0.4s
+		{0x4E825820, V_UZP2, 4, 0, 16, false},  // uzp2 v0.4s
+		{0x4E822820, V_TRN1, 4, 0, 16, false},  // trn1 v0.4s
+		{0x4E826820, V_TRN2, 4, 0, 16, false},  // trn2 v0.4s
+		{0x4E023820, V_ZIP1, 1, 0, 16, false},  // zip1 v0.16b
+		{0x4EC23820, V_ZIP1, 8, 0, 16, false},  // zip1 v0.2d
+		{0x4EA00820, V_REV64, 4, 8, 16, false}, // rev64 v0.4s (container 8)
+		{0x2E200820, V_REV32, 1, 4, 8, false},  // rev32 v0.8b (container 4)
+		{0x4E201820, V_REV16, 1, 2, 16, false}, // rev16 v0.16b (container 2)
+		{0x4E200820, V_REV64, 1, 8, 16, false}, // rev64 v0.16b
+	}
+	insts := make([]vm.Instruction, 0, len(cases)+2)
+	for _, c := range cases {
+		in := d.Decode(c.raw, 0)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "es", c.es, in.Shift)
+		expect(t, "nbytes", c.nb, in.Imm)
+		if c.op == V_REV16 || c.op == V_REV32 || c.op == V_REV64 {
+			expect(t, "container", c.aux, in.Cond)
+		}
+		insts = append(insts, in)
+	}
+	// EXT: Shift=index, Imm=nbytes
+	ext16 := d.Decode(0x6E022020, 0) // ext v0.16b, #4
+	expect(t, "EXT Op", int(V_EXT), ext16.Op)
+	expect(t, "EXT index", 4, ext16.Shift)
+	expect(t, "EXT nbytes", int64(16), ext16.Imm)
+	ext8 := d.Decode(0x2E021820, 0) // ext v0.8b, #3
+	expect(t, "EXT8 index", 3, ext8.Shift)
+	expect(t, "EXT8 nbytes", int64(8), ext8.Imm)
+	insts = append(insts, ext16, ext8)
+
+	tr := NewTranslator(0x400000, 0x20)
+	res, err := tr.Translate(insts)
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	expect(t, "all translated", len(insts), res.TransInsts)
+}
+
 // FP 运算翻译 emit: 确认生成对应的 VM 操作码。
 func TestTranslate_SIMDFP_FPArith(t *testing.T) {
 	d := NewDecoder()

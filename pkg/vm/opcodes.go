@@ -162,6 +162,15 @@ const (
 	// NEON 向量整数↔浮点转换: [op][subop][d][n][esize][nbytes] = 6B
 	//   subop 0 SCVTF 1 UCVTF (int→fp) 2 FCVTZS 3 FCVTZU (fp→int, 向零截断/饱和)
 	OpVecCvt byte = 0x4A
+	// NEON 置换: [op][subop][d][n][m][esize][nbytes] = 7B
+	//   subop 0 ZIP1 1 ZIP2 2 UZP1 3 UZP2 4 TRN1 5 TRN2
+	OpVecPerm byte = 0x4B
+	// NEON 元素反转: [op][d][n][container][esize][nbytes] = 6B
+	//   在每个 container 字节组内, 反转 esize 字节元素的顺序 (REV16/32/64)
+	OpVecRev byte = 0x4C
+	// NEON 提取 EXT: [op][d][n][m][index][nbytes] = 6B
+	//   从 concat(Vn:Vm) 的第 index 字节起取 nbytes 字节
+	OpVecExt byte = 0x4E
 
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target

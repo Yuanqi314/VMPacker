@@ -133,6 +133,13 @@
 #define OP_VEC_CVT                                                             \
   0x4A /* 向量 int↔fp 转换 6B: [op][subop][d][n][es][nbytes]                   \
           (0 SCVTF 1 UCVTF 2 FCVTZS 3 FCVTZU) */
+#define OP_VEC_PERM                                                            \
+  0x4B /* 置换 7B: [op][subop][d][n][m][es][nbytes]                            \
+          (0 ZIP1 1 ZIP2 2 UZP1 3 UZP2 4 TRN1 5 TRN2) */
+#define OP_VEC_REV                                                             \
+  0x4C /* 元素反转 6B: [op][d][n][container][es][nbytes] (REV16/32/64) */
+#define OP_VEC_EXT                                                             \
+  0x4E /* 提取 6B: [op][d][n][m][index][nbytes] (concat(Vn:Vm)) */
 
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \

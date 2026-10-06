@@ -337,6 +337,63 @@ static inline u32 h_veccvt(vm_ctx_t *vm) {
   return 6;
 }
 
+/* 向量置换: [op][subop][d][n][m][es][nbytes]
+ *   subop 0 ZIP1 1 ZIP2 2 UZP1 3 UZP2 4 TRN1 5 TRN2 */
+static inline u32 h_vecperm(vm_ctx_t *vm) {
+  u8 sub = vm->bc[vm->pc + 1], d = vm->bc[vm->pc + 2], n = vm->bc[vm->pc + 3];
+  u8 m = vm->bc[vm->pc + 4], es = vm->bc[vm->pc + 5], nb = vm->bc[vm->pc + 6];
+  const u8 *pn = vm->V[n & 31], *pm = vm->V[m & 31];
+  int L = nb / es; /* 总 lane 数 */
+  u8 tmp[16];
+  for (int j = 0; j < L; j++) {
+    const u8 *src;
+    int lane;
+    switch (sub) {
+    case 0: src = (j & 1) ? pm : pn; lane = j / 2; break;            /* ZIP1 */
+    case 1: src = (j & 1) ? pm : pn; lane = L / 2 + j / 2; break;    /* ZIP2 */
+    case 2: { int idx = 2 * j; if (idx < L) { src = pn; lane = idx; } else { src = pm; lane = idx - L; } break; } /* UZP1 */
+    case 3: { int idx = 2 * j + 1; if (idx < L) { src = pn; lane = idx; } else { src = pm; lane = idx - L; } break; } /* UZP2 */
+    case 4: src = (j & 1) ? pm : pn; lane = (j & 1) ? j - 1 : j; break; /* TRN1 */
+    case 5: src = (j & 1) ? pm : pn; lane = (j & 1) ? j : j + 1; break; /* TRN2 */
+    default: src = pn; lane = j; break;
+    }
+    vn_wrlane(tmp, j * es, es, vn_rdlane(src, lane * es, es));
+  }
+  vn_commit(vm, d, tmp, nb);
+  return 7;
+}
+
+/* 元素反转: [op][d][n][container][es][nbytes]
+ *   在每个 container 字节组内反转 es 字节元素顺序 (REV16/32/64) */
+static inline u32 h_vecrev(vm_ctx_t *vm) {
+  u8 d = vm->bc[vm->pc + 1], n = vm->bc[vm->pc + 2], cont = vm->bc[vm->pc + 3];
+  u8 es = vm->bc[vm->pc + 4], nb = vm->bc[vm->pc + 5];
+  const u8 *pn = vm->V[n & 31];
+  u8 tmp[16];
+  int epc = cont / es; /* 每个 container 内的元素个数 */
+  for (int base = 0; base + cont <= nb; base += cont)
+    for (int i = 0; i < epc; i++)
+      vn_wrlane(tmp, base + (epc - 1 - i) * es, es,
+                vn_rdlane(pn, base + i * es, es));
+  vn_commit(vm, d, tmp, nb);
+  return 6;
+}
+
+/* 提取 EXT: [op][d][n][m][index][nbytes]
+ *   concat(Vn 低 : Vm 高), 从第 index 字节起取 nbytes 字节 */
+static inline u32 h_vecext(vm_ctx_t *vm) {
+  u8 d = vm->bc[vm->pc + 1], n = vm->bc[vm->pc + 2], m = vm->bc[vm->pc + 3];
+  u8 idx = vm->bc[vm->pc + 4], nb = vm->bc[vm->pc + 5];
+  const u8 *pn = vm->V[n & 31], *pm = vm->V[m & 31];
+  u8 tmp[16];
+  for (int i = 0; i < nb; i++) {
+    int s = idx + i;
+    tmp[i] = (s < nb) ? pn[s] : pm[s - nb];
+  }
+  vn_commit(vm, d, tmp, nb);
+  return 6;
+}
+
 /* 浮点比较: [op][subop][d][n][m][es][nbytes]  subop 0 EQ 1 GE 2 GT
  * 无序 (NaN) 一律为假 → 全 0, 与 FCMEQ/FCMGE/FCMGT 一致 */
 static inline u32 h_vecfcmp(vm_ctx_t *vm) {

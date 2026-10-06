@@ -279,6 +279,67 @@ int main(void) {
     CHECK((i64)getlane(0, 0, 8) == -5 && (i64)getlane(0, 8, 8) == 42, "fcvtzs 2d");
   }
 
+  /* ---- 置换 ZIP1/ZIP2/UZP1/UZP2/TRN1/TRN2 (v.4s) ---- */
+  {
+    for (int i = 0; i < 4; i++) { setlane(1, i * 4, 4, 0x10 + i); setlane(2, i * 4, 4, 0x20 + i); }
+    /* n=[10,11,12,13], m=[20,21,22,23] (十六进制) */
+    bc[0] = OP_VEC_PERM; bc[2] = 0; bc[3] = 1; bc[4] = 2; bc[5] = 4; bc[6] = 16;
+    bc[1] = 0; vm.pc = 0; h_vecperm(&vm); /* ZIP1: n0,m0,n1,m1 */
+    CHECK(getlane(0, 0, 4) == 0x10 && getlane(0, 4, 4) == 0x20 &&
+          getlane(0, 8, 4) == 0x11 && getlane(0, 12, 4) == 0x21, "zip1 4s");
+    bc[1] = 1; vm.pc = 0; h_vecperm(&vm); /* ZIP2: n2,m2,n3,m3 */
+    CHECK(getlane(0, 0, 4) == 0x12 && getlane(0, 4, 4) == 0x22 &&
+          getlane(0, 12, 4) == 0x23, "zip2 4s");
+    bc[1] = 2; vm.pc = 0; h_vecperm(&vm); /* UZP1: n0,n2,m0,m2 */
+    CHECK(getlane(0, 0, 4) == 0x10 && getlane(0, 4, 4) == 0x12 &&
+          getlane(0, 8, 4) == 0x20 && getlane(0, 12, 4) == 0x22, "uzp1 4s");
+    bc[1] = 3; vm.pc = 0; h_vecperm(&vm); /* UZP2: n1,n3,m1,m3 */
+    CHECK(getlane(0, 0, 4) == 0x11 && getlane(0, 8, 4) == 0x21, "uzp2 4s");
+    bc[1] = 4; vm.pc = 0; h_vecperm(&vm); /* TRN1: n0,m0,n2,m2 */
+    CHECK(getlane(0, 0, 4) == 0x10 && getlane(0, 4, 4) == 0x20 &&
+          getlane(0, 8, 4) == 0x12 && getlane(0, 12, 4) == 0x22, "trn1 4s");
+    bc[1] = 5; vm.pc = 0; h_vecperm(&vm); /* TRN2: n1,m1,n3,m3 */
+    CHECK(getlane(0, 0, 4) == 0x11 && getlane(0, 4, 4) == 0x21 &&
+          getlane(0, 12, 4) == 0x23, "trn2 4s");
+  }
+  /* ---- 元素反转 REV (字节序) ---- */
+  {
+    /* rev64 v0.16b: 反转每 8 字节 */
+    for (int i = 0; i < 16; i++) vm.V[1][i] = (u8)i;
+    bc[0] = OP_VEC_REV; bc[1] = 0; bc[2] = 1; bc[3] = 8; bc[4] = 1; bc[5] = 16;
+    vm.pc = 0;
+    u32 sz = h_vecrev(&vm);
+    CHECK(sz == 6, "vecrev size 6");
+    CHECK(vm.V[0][0] == 7 && vm.V[0][7] == 0 && vm.V[0][8] == 15 && vm.V[0][15] == 8,
+          "rev64 16b: 每 8 字节反转");
+    /* rev16 v0.16b: 每 2 字节交换 */
+    bc[3] = 2; vm.pc = 0; h_vecrev(&vm);
+    CHECK(vm.V[0][0] == 1 && vm.V[0][1] == 0 && vm.V[0][2] == 3 && vm.V[0][3] == 2,
+          "rev16 16b: 相邻字节交换");
+    /* rev64 v0.4s: 每 8 字节内交换两个 4 字节字 */
+    for (int i = 0; i < 4; i++) setlane(1, i * 4, 4, 0x100 + i);
+    bc[3] = 8; bc[4] = 4; vm.pc = 0; h_vecrev(&vm);
+    CHECK(getlane(0, 0, 4) == 0x101 && getlane(0, 4, 4) == 0x100 &&
+          getlane(0, 8, 4) == 0x103 && getlane(0, 12, 4) == 0x102, "rev64 4s: 字对调");
+  }
+  /* ---- EXT ---- */
+  {
+    for (int i = 0; i < 16; i++) { vm.V[1][i] = (u8)i; vm.V[2][i] = (u8)(0x80 + i); }
+    bc[0] = OP_VEC_EXT; bc[1] = 0; bc[2] = 1; bc[3] = 2; bc[4] = 4; bc[5] = 16; /* ext #4 */
+    vm.pc = 0;
+    u32 sz = h_vecext(&vm);
+    CHECK(sz == 6, "vecext size 6");
+    /* 结果 = Vn[4..15], Vm[0..3] = 4,5,...,15,0x80,0x81,0x82,0x83 */
+    CHECK(vm.V[0][0] == 4 && vm.V[0][11] == 15 && vm.V[0][12] == 0x80 && vm.V[0][15] == 0x83,
+          "ext #4 16b");
+    /* Q=0 (8 字节), ext #3 */
+    bc[4] = 3; bc[5] = 8; vm.pc = 0; h_vecext(&vm);
+    CHECK(vm.V[0][0] == 3 && vm.V[0][4] == 7 && vm.V[0][5] == 0x80 && vm.V[0][7] == 0x82,
+          "ext #3 8b");
+    int hz = 1; for (int i = 8; i < 16; i++) if (vm.V[0][i]) hz = 0;
+    CHECK(hz, "ext Q=0 清零高 8 字节");
+  }
+
   printf("\n%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);
   return fails ? 1 : 0;
 }
