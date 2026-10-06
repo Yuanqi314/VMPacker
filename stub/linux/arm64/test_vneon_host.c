@@ -2,6 +2,7 @@
  * test_vneon_host.c — 基础 NEON 向量 handler 宿主机单元测试 (x86 gcc 直接编译运行)
  *   gcc -I stub/linux/arm64 -o /tmp/tvn stub/linux/arm64/test_vneon_host.c && /tmp/tvn
  */
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -207,6 +208,40 @@ int main(void) {
     vn_wrf(vm.V[1], 0, __builtin_nanf("")); /* NaN */
     bc[1] = 1; vm.pc = 0; h_vecfcmp(&vm); /* FCMGE */
     CHECK(getlane(0, 0, 4) == 0, "fcmge NaN 无序→假");
+  }
+
+  /* ---- 向量 FMLA/FMLS (v.4s / v.2d) ---- */
+  {
+    /* d=[1,2,3,4], n=[2,2,2,2], m=[3,3,3,3]; FMLA → d+=n*m = [7,8,9,10] */
+    float dv[4] = {1, 2, 3, 4}, nv[4] = {2, 2, 2, 2}, mv[4] = {3, 3, 3, 3};
+    for (int i = 0; i < 4; i++) {
+      vn_wrf(vm.V[0], i * 4, dv[i]);
+      vn_wrf(vm.V[1], i * 4, nv[i]);
+      vn_wrf(vm.V[2], i * 4, mv[i]);
+    }
+    bc[0] = OP_VEC_FMA; bc[1] = 0; bc[2] = 0; bc[3] = 1; bc[4] = 2; bc[5] = 4; bc[6] = 16;
+    vm.pc = 0;
+    u32 sz = h_vecfma(&vm);
+    CHECK(sz == 7, "vecfma size 7");
+    CHECK(vn_rdf(vm.V[0], 0) == 7.0f && vn_rdf(vm.V[0], 4) == 8.0f &&
+          vn_rdf(vm.V[0], 8) == 9.0f && vn_rdf(vm.V[0], 12) == 10.0f, "fmla 4s: d+=n*m");
+    /* FMLS: d-=n*m, 从 [7,8,9,10] → [1,2,3,4] */
+    bc[1] = 1; vm.pc = 0; h_vecfma(&vm);
+    CHECK(vn_rdf(vm.V[0], 0) == 1.0f && vn_rdf(vm.V[0], 12) == 4.0f, "fmls 4s: d-=n*m");
+    /* 2d 双精度 */
+    vn_wrd(vm.V[0], 0, 10.0); vn_wrd(vm.V[0], 8, 20.0);
+    vn_wrd(vm.V[1], 0, 1.5); vn_wrd(vm.V[1], 8, 2.0);
+    vn_wrd(vm.V[2], 0, 4.0); vn_wrd(vm.V[2], 8, 3.0);
+    bc[1] = 0; bc[5] = 8; vm.pc = 0; h_vecfma(&vm);
+    CHECK(vn_rdd(vm.V[0], 0) == 16.0 && vn_rdd(vm.V[0], 8) == 26.0, "fmla 2d: d+=n*m");
+    /* 融合性: 单次舍入与朴素不同 */
+    double n1 = 1.0 + ldexp(1.0, -27), m1 = n1, a1 = -(1.0 + ldexp(1.0, -26));
+    vn_wrd(vm.V[0], 0, a1); vn_wrd(vm.V[1], 0, n1); vn_wrd(vm.V[2], 0, m1);
+    bc[6] = 8; vm.pc = 0; h_vecfma(&vm); /* .1d: 只算 lane0 */
+    volatile double prod = n1 * m1;
+    double naive = prod + a1;
+    CHECK(vn_rdd(vm.V[0], 0) == __builtin_fma(n1, m1, a1) && naive == 0.0 &&
+          vn_rdd(vm.V[0], 0) != 0.0, "fmla 融合 (非朴素 mul+add)");
   }
 
   printf("\n%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);

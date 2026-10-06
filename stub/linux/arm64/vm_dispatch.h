@@ -324,6 +324,9 @@ __attribute__((noinline)) VM_SECTION_ALU static u32 hw_veccmp(vm_ctx_t *vm) {
 __attribute__((noinline)) VM_SECTION_ALU static u32 hw_vecfcmp(vm_ctx_t *vm) {
   return h_vecfcmp(vm);
 }
+__attribute__((noinline)) VM_SECTION_ALU static u32 hw_vecfma(vm_ctx_t *vm) {
+  return h_vecfma(vm);
+}
 
 /* ---- TBZ/TBNZ (分支, 返回 0) ---- */
 __attribute__((noinline)) VM_SECTION_BRANCH static u32 hw_tbz(vm_ctx_t *vm) {
@@ -650,6 +653,7 @@ __attribute__((noinline)) static void vm_init_jump_table(vm_handler_fn *tbl) {
   tbl[OP_V_INS_E] = hw_vinse;
   tbl[OP_VEC_CMP] = hw_veccmp;
   tbl[OP_VEC_FCMP] = hw_vecfcmp;
+  tbl[OP_VEC_FMA] = hw_vecfma;
 
   /* TBZ/TBNZ */
   tbl[OP_TBZ] = hw_tbz;

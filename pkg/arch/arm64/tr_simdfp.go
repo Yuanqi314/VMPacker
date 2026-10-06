@@ -389,6 +389,16 @@ func (t *Translator) trVecFCmp(inst vm.Instruction, subop byte) error {
 	return nil
 }
 
+// trVecFma 翻译向量浮点融合乘加。subop: 0 FMLA(d+=n*m) 1 FMLS(d-=n*m)。
+func (t *Translator) trVecFma(inst vm.Instruction, subop byte) error {
+	d, n, m, err := t.vreg3(inst)
+	if err != nil {
+		return err
+	}
+	t.emit(vm.OpVecFma, subop, d, n, m, byte(inst.Shift), byte(inst.Imm))
+	return nil
+}
+
 func (t *Translator) trVecNot(inst vm.Instruction) error {
 	d, err := t.vreg(inst.Rd)
 	if err != nil {

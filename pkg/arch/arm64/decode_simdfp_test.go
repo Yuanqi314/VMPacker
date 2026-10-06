@@ -291,6 +291,38 @@ func TestDecode_SIMDFP_Cmp(t *testing.T) {
 	expect(t, "all translated", len(cases), res.TransInsts)
 }
 
+// 向量浮点融合乘加解码 (FMLA/FMLS)。
+func TestDecode_SIMDFP_VFma(t *testing.T) {
+	d := NewDecoder()
+	cases := []struct {
+		raw uint32
+		op  Op
+		es  int
+		nb  int64
+	}{
+		{0x4E22CC20, V_VFMLA, 4, 16}, // fmla v0.4s
+		{0x4EA2CC20, V_VFMLS, 4, 16}, // fmls v0.4s
+		{0x4E62CC20, V_VFMLA, 8, 16}, // fmla v0.2d
+		{0x4EE2CC20, V_VFMLS, 8, 16}, // fmls v0.2d
+		{0x0E22CC20, V_VFMLA, 4, 8},  // fmla v0.2s (Q=0)
+	}
+	insts := make([]vm.Instruction, len(cases))
+	for i, c := range cases {
+		in := d.Decode(c.raw, i*4)
+		expect(t, "Op", int(c.op), in.Op)
+		expect(t, "es", c.es, in.Shift)
+		expect(t, "nbytes", c.nb, in.Imm)
+		insts[i] = in
+	}
+	tr := NewTranslator(0x400000, 0x20)
+	res, err := tr.Translate(insts)
+	if err != nil {
+		t.Fatalf("translate error: %v", err)
+	}
+	expect(t, "no unsupported", 0, len(res.Unsupported))
+	expect(t, "all translated", len(cases), res.TransInsts)
+}
+
 // FP 运算翻译 emit: 确认生成对应的 VM 操作码。
 func TestTranslate_SIMDFP_FPArith(t *testing.T) {
 	d := NewDecoder()

@@ -15,6 +15,7 @@
 
 #include "../vm_decode.h"
 #include "../vm_types.h"
+#include "h_vfp.h" /* vf_fma_d / vf_fma_f (向量 FMLA/FMLS 复用) */
 
 static inline u64 vn_rdlane(const u8 *p, int off, int es) {
   u64 v = 0;
@@ -250,6 +251,27 @@ static inline u32 h_veccmp(vm_ctx_t *vm) {
     case 5: res = ((a & b) != 0); break;
     }
     vn_wrlane(tmp, off, es, res ? mask : 0);
+  }
+  vn_commit(vm, d, tmp, nb);
+  return 7;
+}
+
+/* 向量浮点融合乘加: [op][subop][d][n][m][es][nbytes]
+ *   subop 0 FMLA(d += n*m)  1 FMLS(d -= n*m); 逐 lane 单次舍入 fma
+ *   FMLA=fma(n,m,d)  FMLS=fma(-n,m,d) */
+static inline u32 h_vecfma(vm_ctx_t *vm) {
+  u8 sub = vm->bc[vm->pc + 1], d = vm->bc[vm->pc + 2], n = vm->bc[vm->pc + 3];
+  u8 m = vm->bc[vm->pc + 4], es = vm->bc[vm->pc + 5], nb = vm->bc[vm->pc + 6];
+  const u8 *pn = vm->V[n & 31], *pm = vm->V[m & 31], *pd = vm->V[d & 31];
+  u8 tmp[16];
+  for (int off = 0; off + es <= nb; off += es) {
+    if (es == 8) {
+      double a = vn_rdd(pd, off), x = vn_rdd(pn, off), y = vn_rdd(pm, off);
+      vn_wrd(tmp, off, sub == 0 ? vf_fma_d(x, y, a) : vf_fma_d(-x, y, a));
+    } else {
+      float a = vn_rdf(pd, off), x = vn_rdf(pn, off), y = vn_rdf(pm, off);
+      vn_wrf(tmp, off, sub == 0 ? vf_fma_f(x, y, a) : vf_fma_f(-x, y, a));
+    }
   }
   vn_commit(vm, d, tmp, nb);
   return 7;

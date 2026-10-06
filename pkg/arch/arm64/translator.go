@@ -728,6 +728,10 @@ func (t *Translator) translateOne(instructions []vm.Instruction, idx int) (int, 
 		return 0, t.trVecFCmp(inst, 1)
 	case V_VFCMGT:
 		return 0, t.trVecFCmp(inst, 2)
+	case V_VFMLA:
+		return 0, t.trVecFma(inst, 0)
+	case V_VFMLS:
+		return 0, t.trVecFma(inst, 1)
 
 	default:
 		return 0, fmt.Errorf("不支持的指令类型")

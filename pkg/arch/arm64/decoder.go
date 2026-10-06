@@ -223,6 +223,9 @@ const (
 	V_VFCMEQ // 浮点 ==
 	V_VFCMGE // 浮点 >=
 	V_VFCMGT // 浮点 >
+	// NEON 向量浮点融合乘加
+	V_VFMLA // Vd += Vn*Vm
+	V_VFMLS // Vd -= Vn*Vm
 	UNSUPPORTED
 )
 
@@ -415,6 +418,7 @@ func OpName(op Op) string {
 		V_VCMEQ: "CMEQ", V_VCMGT: "CMGT", V_VCMGE: "CMGE", V_VCMHI: "CMHI",
 		V_VCMHS: "CMHS", V_VCMTST: "CMTST",
 		V_VFCMEQ: "FCMEQ", V_VFCMGE: "FCMGE", V_VFCMGT: "FCMGT",
+		V_VFMLA: "FMLA", V_VFMLS: "FMLS",
 	}
 	if n, ok := names[op]; ok {
 		return n

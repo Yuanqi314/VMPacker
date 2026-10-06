@@ -156,6 +156,9 @@ const (
 	OpVecCmp byte = 0x45
 	// 浮点: [op][subop][d][n][m][esize][nbytes] = 7B  (subop 0 EQ 1 GE 2 GT)
 	OpVecFCmp byte = 0x46
+	// NEON 向量浮点融合乘加: [op][subop][d][n][m][esize][nbytes] = 7B
+	//   subop 0 FMLA(d+=n*m) 1 FMLS(d-=n*m); 逐 lane 单次舍入 fma
+	OpVecFma byte = 0x48
 
 	// TBZ/TBNZ: [op][reg][bit][target32] = 7B
 	OpTbz  byte = 0x16 // TBZ  Xt, #bit, target

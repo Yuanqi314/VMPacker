@@ -127,6 +127,9 @@
           (0 EQ 1 GT 2 GE 3 HI 4 HS 5 TST) */
 #define OP_VEC_FCMP                                                            \
   0x46 /* 浮点 7B: [op][subop][d][n][m][es][nbytes] (0 EQ 1 GE 2 GT) */
+#define OP_VEC_FMA                                                             \
+  0x48 /* 向量 FMLA/FMLS 7B: [op][subop][d][n][m][es][nbytes]                  \
+          (0 FMLA d+=n*m, 1 FMLS d-=n*m) */
 
 /* ---- TBZ/TBNZ ---- */
 #define OP_TBZ                                                                 \

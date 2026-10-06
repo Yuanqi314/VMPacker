@@ -461,6 +461,10 @@ var simdfpPatterns = []InstrPattern{
 				}
 			case opc == 0b10011 && U == 0: // MUL
 				inst.Op, inst.Shift = int(V_VMUL), 1<<uint(size)
+			case opc == 0b11001 && U == 0 && b23 == 0: // FMLA
+				inst.Op, inst.Shift = int(V_VFMLA), fpEs
+			case opc == 0b11001 && U == 0 && b23 == 1: // FMLS
+				inst.Op, inst.Shift = int(V_VFMLS), fpEs
 			case opc == 0b11100 && U == 0 && b23 == 0: // FCMEQ
 				inst.Op, inst.Shift = int(V_VFCMEQ), fpEs
 			case opc == 0b11100 && U == 1 && b23 == 0: // FCMGE
